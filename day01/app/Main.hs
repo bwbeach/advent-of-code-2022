@@ -12,8 +12,8 @@ runInput :: String -> IO ()
 runInput fileName = do
   input <- readFile fileName
   putStrLn fileName
-  putStrLn . show . day01 1 $ input
-  putStrLn . show . day01 3 $ input
+  print . day01 1 $ input
+  print . day01 3 $ input
 
 day01 :: Int -> String -> Int
 day01 n input = sum . take n . reverse . sort $ map sumStrings (splitOn [""] (endBy "\n" input))
