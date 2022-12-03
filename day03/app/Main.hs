@@ -15,10 +15,14 @@ runInput :: String -> IO ()
 runInput fileName = do
   input <- readFile fileName
   putStrLn fileName
-  print . day03 $ input
+  print . day03a $ input
+  print . day03b $ input
 
-day03 :: String -> Int
-day03 = sum . map (priority . commonItem) . endBy "\n"
+day03a :: String -> Int
+day03a = sum . map (priority . commonItem) . endBy "\n"
+
+day03b :: String -> Int
+day03b = sum . map (priority . commonInAll) . groupIntoTriples . endBy "\n"
 
 priority :: Char -> Int
 priority c
@@ -36,3 +40,14 @@ commonItem s =
 
 uniqueElement :: [Char] -> Char
 uniqueElement [c] = c
+
+groupIntoTriples :: [String] -> [[String]]
+groupIntoTriples [] = []
+groupIntoTriples (a : b : c : rest) = [a, b, c] : groupIntoTriples rest
+
+commonInAll :: [String] -> Char
+commonInAll = uniqueElement . Set.elems . intersectAll . map Set.fromList
+
+intersectAll :: [Set.Set Char] -> Set.Set Char
+intersectAll [a] = a
+intersectAll (a : b : rest) = intersectAll ((a `Set.intersection` b) : rest)
