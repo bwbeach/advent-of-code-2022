@@ -16,10 +16,7 @@ runInput fileName = do
   print . day01 3 $ input
 
 day01 :: Int -> String -> Int
-day01 n input = sum . take n . reverse . sort $ map sumStrings (splitOn [""] (endBy "\n" input))
-
-readInt :: String -> Int
-readInt s = read s :: Int
+day01 n = sum . take n . reverse . sort . map sumStrings . splitOn [""] . endBy "\n"
 
 sumStrings :: [String] -> Int
-sumStrings list = sum (map readInt list)
+sumStrings = sum . map read
