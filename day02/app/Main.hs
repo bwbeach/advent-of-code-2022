@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+
 module Main where
 
 import Data.List.Split
@@ -34,14 +36,12 @@ decodeOutcome :: Char -> Int
 decodeOutcome 'X' = 0
 decodeOutcome 'Y' = 3
 decodeOutcome 'Z' = 6
-decodeOutcome _ = -1
 
 scoreLine :: (String -> Char -> String) -> String -> Int
 scoreLine chooser [theirCode, ' ', myCode] =
   let theirChoice = decode theirCode
       myChoice = chooser theirChoice myCode
    in scoreMyChoice myChoice + scoreOutcome myChoice theirChoice
-scoreLine _ _ = -100000000
 
 scoreOutcome :: String -> String -> Int
 scoreOutcome myChoice theirChoice
@@ -53,7 +53,6 @@ scoreMyChoice :: String -> Int
 scoreMyChoice "rock" = 1
 scoreMyChoice "paper" = 2
 scoreMyChoice "scissors" = 3
-scoreMyChoice _ = -100000000
 
 decode :: Char -> String
 decode 'A' = "rock"
@@ -62,7 +61,6 @@ decode 'C' = "scissors"
 decode 'X' = "rock"
 decode 'Y' = "paper"
 decode 'Z' = "scissors"
-decode _ = "unknown"
 
 isWin :: String -> String -> Bool
 isWin "rock" "scissors" = True
