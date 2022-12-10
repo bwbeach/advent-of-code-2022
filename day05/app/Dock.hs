@@ -13,9 +13,10 @@ module Dock
   )
 where
 
+import qualified Data.Char as C
 import qualified Data.IntMap.Strict as M
 import qualified Data.List as L
-import Debug.Trace
+import Data.Maybe (mapMaybe)
 
 newtype Dock = Dock (M.IntMap [Char])
 
@@ -23,19 +24,16 @@ instance Show Dock where
   show (Dock d) =
     let tallest = maximum $ map length (M.elems d)
         extended = M.map (extend tallest) d
-        zipped = L.transpose [getStack 1 extended, getStack 2 extended, getStack 3 extended]
+        zipped = L.transpose (M.elems extended)
         levels = map formatLevel zipped
-     in unlines $ levels ++ [" 1   2   3 "]
+        legend = L.intercalate "   " (map show (M.keys extended))
+     in unlines $ levels ++ [" " ++ legend]
 
 tops :: Dock -> String
-tops (Dock m) =
-  [ first (getStack 1 m),
-    first (getStack 2 m),
-    first (getStack 3 m)
-  ]
+tops (Dock m) = map first (M.elems m)
 
-first :: String -> Char
-first (c : _) = c
+first :: [a] -> a
+first (x : _) = x
 
 formatLevel :: String -> String
 formatLevel crates = unwords $ map formatCrate crates
@@ -59,17 +57,25 @@ extend n items = replicate (n - length items) ' ' ++ items
 
 parse :: [String] -> Dock
 parse rows =
-  let crateLines = dropLast rows
-   in Dock
-        ( M.fromList
-            [ (1, extractColumn 1 crateLines),
-              (2, extractColumn 5 crateLines),
-              (3, extractColumn 9 crateLines)
-            ]
-        )
+  let (key : bottomToTop) = reverse rows
+      addList = concatMap (makeAddList key) bottomToTop
+   in foldl addToDock empty addList
 
-extractColumn :: Int -> [String] -> [Char]
-extractColumn col = filter (/= ' ') . map (!! col)
+addToDock :: Dock -> (Int, Char) -> Dock
+addToDock (Dock m0) (stack, crate) =
+  let before = getStack stack m0
+      after = crate : before
+      m1 = M.insert stack after m0
+   in Dock m1
+
+makeAddList :: String -> String -> [(Int, Char)]
+makeAddList key crates = mapMaybe makeAdd (zip key crates)
+
+makeAdd :: (Char, Char) -> Maybe (Int, Char)
+makeAdd (key, crate) =
+  if C.isDigit key && C.isLetter crate
+    then Just (read [key], crate)
+    else Nothing
 
 move :: Dock -> (Int, Int, Int) -> Dock
 move start (count, from, to) =
@@ -79,11 +85,7 @@ move start (count, from, to) =
       m1 = M.insert from (drop count src) m0
       dst = getStack to m1
       m2 = M.insert to (reverse items ++ dst) m1
-   in trace (show (count, from, to) ++ "\n" ++ show (Dock m2) ++ "\n") Dock m2
-
-dropLast :: [a] -> [a]
-dropLast [_] = []
-dropLast (a : as) = a : dropLast as
+   in Dock m2
 
 getStack :: Int -> M.IntMap [Char] -> [Char]
 getStack = M.findWithDefault []
