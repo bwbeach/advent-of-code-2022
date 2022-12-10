@@ -77,14 +77,14 @@ makeAdd (key, crate) =
     then Just (read [key], crate)
     else Nothing
 
-move :: Dock -> (Int, Int, Int) -> Dock
-move start (count, from, to) =
+move :: (String -> String) -> Dock -> (Int, Int, Int) -> Dock
+move xform start (count, from, to) =
   let Dock m0 = start
       src = getStack from m0
       items = take count src
       m1 = M.insert from (drop count src) m0
       dst = getStack to m1
-      m2 = M.insert to (reverse items ++ dst) m1
+      m2 = M.insert to (xform items ++ dst) m1
    in Dock m2
 
 getStack :: Int -> M.IntMap [Char] -> [Char]

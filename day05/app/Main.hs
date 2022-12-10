@@ -23,12 +23,13 @@ runInput :: String -> IO ()
 runInput fileName = do
   input <- readFile fileName
   putStrLn fileName
-  print . day05 $ input
+  print . day05 reverse $ input
+  print . day05 id $ input
 
-day05 :: String -> String
-day05 input =
+day05 :: (String -> String) -> String -> String
+day05 xform input =
   let (dock, moves) = parseInput input
-      afterMove = foldl D.move dock moves
+      afterMove = foldl (D.move xform) dock moves
    in D.tops afterMove
 
 parseInput :: String -> (D.Dock, [Move])
