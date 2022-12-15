@@ -18,17 +18,25 @@ runInput :: String -> IO ()
 runInput fileName = do
   input <- readFile fileName
   putStrLn fileName
-  print . day08 $ input
+  print . day08a $ input
+  print . day08b $ input
 
 -- Finds, then counts, the positions of all visible trees in the forest.
 --
 -- Works by adding all of the visible trees on all sightlines
 -- to a set to avoid duplicates.
-day08 :: String -> Int
-day08 input =
+day08a :: String -> Int
+day08a input =
   let forest = parseForest input
       sightlines = allSightlines forest
    in Set.size . Set.fromList $ concatMap (visibleInSightline forest) sightlines
+
+-- Finds the location with the highest score of distance visible from a treehouse
+day08b :: String -> Int
+day08b input =
+  let forest = parseForest input
+      scores = map (viewScore forest) (allPoints forest)
+   in maximum scores
 
 -- A Point names one location in the forest.
 -- It's a point on a rectangular grid.  Upper left corner is (Point 0 0)
@@ -67,6 +75,11 @@ instance Show Forest where
 -- Displays one row in a forest
 formatRow :: Int -> Int -> Map.Map Point Int -> String
 formatRow w y m = concatMap (\x -> show (m Map.! Point x y)) (countUp w)
+
+-- A list of all of the points in a forest
+allPoints :: Forest -> [Point]
+allPoints (Forest w h _) =
+  concatMap (\x -> map (x `Point`) (countUp h)) (countUp w)
 
 -- Returns a list of all lines of sight an observer can use to look at trees.
 -- Each one is a sequence of points moving away from the observer.
@@ -130,3 +143,32 @@ visibleInSightline forest sightline =
 
 negativeOne :: Int
 negativeOne = -1
+
+-- Returns the view score from a given point
+viewScore :: Forest -> Point -> Int
+viewScore forest point =
+  product (map (viewDistance forest point) (allSightlinesFrom forest point))
+
+-- Returns all of the sightlines from a treehouse
+allSightlinesFrom :: Forest -> Point -> [Sightline]
+allSightlinesFrom (Forest w h _) (Point x y) =
+  [ map (`Point` y) [x + 1 .. w - 1],
+    map (`Point` y) [x - 1, x - 2 .. 0],
+    map (x `Point`) [y + 1 .. h - 1],
+    map (x `Point`) [y - 1, y - 2 .. 0]
+  ]
+
+-- Returns the distance you can see along a sightline from a treehouse at a given height
+viewDistance :: Forest -> Point -> Sightline -> Int
+viewDistance forest origin sightline =
+  let myHeight = getHeight forest origin
+      visiblePoints = takeUntilAndIncluding (\p -> myHeight <= getHeight forest p) sightline
+   in length visiblePoints
+
+-- Like inverse of takeWhile, but takes items up to AND INCLUDING the first one that matches.
+takeUntilAndIncluding :: (a -> Bool) -> [a] -> [a]
+takeUntilAndIncluding _ [] = []
+takeUntilAndIncluding f (a : as) =
+  if f a
+    then [a]
+    else a : takeUntilAndIncluding f as
