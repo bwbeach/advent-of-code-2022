@@ -15,10 +15,11 @@ runInput :: String -> IO ()
 runInput fileName = do
   input <- readFile fileName
   putStrLn fileName
-  print . day11 $ input
+  print . day11 20 $ input
 
-day11 :: String -> Int
-day11 = product . take 2 . reverse . sort . map inspections . IntMap.elems . runNRounds 20 . parseInput
+day11 :: Int -> String -> Int
+day11 numRounds =
+  product . take 2 . reverse . sort . map inspections . IntMap.elems . runNRounds numRounds . parseInput
 
 type Flock = IntMap.IntMap Monkey
 
