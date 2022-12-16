@@ -50,13 +50,8 @@ parseLine text =
 update :: State -> Dir -> State
 update (h0 : ts) dir =
   let h1 = move h0 dir
-   in h1 : updateTails h1 ts
-
-updateTails :: Point -> [Point] -> [Point]
-updateTails _ [] = []
-updateTails prev (t0 : ts) =
-  let t1 = updateTail t0 prev
-   in (t1 : updateTails t1 ts)
+      oneStep prev t0 = let t1 = updateTail t0 prev in (t1, t1)
+   in h1 : knitl oneStep h1 ts
 
 -- Moves a Point in the given direction
 -- Positive x is to the right, positive y is down
