@@ -1,6 +1,6 @@
 module Main where
 
-import Debug.Trace (trace)
+import Data.List.Split (chunksOf)
 
 main :: IO ()
 main = do
@@ -11,13 +11,27 @@ runInput :: String -> IO ()
 runInput fileName = do
   input <- readFile fileName
   putStrLn fileName
-  print . day10 $ input
+  print . day10a $ input
+  putStr . day10b $ input
 
-day10 :: String -> Int
-day10 text =
+day10a :: String -> Int
+day10a text =
   let program = compile . parseInput $ text
       xValues = 1 : knitl executeOne 1 program
-   in sum (map (\n -> trace ("AAA " ++ show (xValues !! n) ++ " " ++ show n) (xValues !! n) * n) [20, 60, 100, 140, 180, 220])
+   in sum (map (\n -> (xValues !! n) * n) [20, 60, 100, 140, 180, 220])
+
+day10b :: String -> String
+day10b text =
+  let program = compile . parseInput $ text
+      xValues = 1 : knitl executeOne 1 program
+      xCoords = concat (replicate 6 [0 .. 39])
+      pixels = zipWith renderPixel xCoords (drop 1 xValues)
+   in unlines (chunksOf 40 pixels)
+
+renderPixel :: Int -> Int -> Char
+renderPixel x v =
+  let isLit = x - 1 <= v && v <= x + 1
+   in if isLit then '#' else '.'
 
 data Instruction
   = Noop
