@@ -7,24 +7,29 @@ import Data.Set as Set
 main :: IO ()
 main = do
   runInput "test.txt"
+  runInput "test2.txt"
   runInput "input.txt"
 
 runInput :: String -> IO ()
 runInput fileName = do
   input <- readFile fileName
   putStrLn fileName
-  print . day08 $ input
+  print . day08 2 $ input
+  print . day08 10 $ input
 
-day08 :: String -> Int
-day08 input =
+day08 :: Int -> String -> Int
+day08 knotCount input =
   let dirs = parseInput input
-      initial = (Point 0 0, Point 0 0)
-      oneStep s d = let (h1, t1) = update s d in (t1, (h1, t1))
+      initial = replicate knotCount (Point 0 0)
+      oneStep s0 d = let s1 = update s0 d in (last s1, s1)
       tailPoints = knitl oneStep initial dirs
    in Set.size . Set.fromList $ tailPoints
 
 -- A point on a rectangular grid
 data Point = Point Int Int deriving (Eq, Ord)
+
+-- A sequence of points, starting with the head and ending with the tail
+type State = [Point]
 
 -- One of the directions a rope end can move
 data Dir = L | R | U | D deriving (Eq, Ord, Read)
@@ -40,13 +45,18 @@ parseLine text =
   let [w0, w1] = words text
    in replicate (read w1) (read w0)
 
--- Updates a (H, T) position by moving the H a given direction
--- and moving the T according to the rules.
-update :: (Point, Point) -> Dir -> (Point, Point)
-update (h0, t0) dir =
+-- Updates a [H, ..., T] position by moving the H a given direction
+-- and moving the Ts according to the rules.
+update :: State -> Dir -> State
+update (h0 : ts) dir =
   let h1 = move h0 dir
-      t1 = updateTail t0 h1
-   in (h1, t1)
+   in h1 : updateTails h1 ts
+
+updateTails :: Point -> [Point] -> [Point]
+updateTails _ [] = []
+updateTails prev (t0 : ts) =
+  let t1 = updateTail t0 prev
+   in (t1 : updateTails t1 ts)
 
 -- Moves a Point in the given direction
 -- Positive x is to the right, positive y is down
