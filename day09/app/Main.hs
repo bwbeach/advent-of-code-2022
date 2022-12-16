@@ -14,11 +14,11 @@ runInput :: String -> IO ()
 runInput fileName = do
   input <- readFile fileName
   putStrLn fileName
-  print . day08 2 $ input
-  print . day08 10 $ input
+  print . day09 2 $ input
+  print . day09 10 $ input
 
-day08 :: Int -> String -> Int
-day08 knotCount input =
+day09 :: Int -> String -> Int
+day09 knotCount input =
   let dirs = parseInput input
       initial = replicate knotCount (Point 0 0)
       oneStep s0 d = let s1 = update s0 d in (last s1, s1)
