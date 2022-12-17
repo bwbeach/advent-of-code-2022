@@ -1,0 +1,12 @@
+main :: IO ()
+main = do
+  runInput "test.txt"
+  runInput "test2.txt"
+  runInput "input.txt"
+
+runInput :: String -> IO ()
+runInput fileName = do
+  input <- readFile fileName
+  putStrLn fileName
+  print . day09 2 $ input
+  print . day09 10 $ input
