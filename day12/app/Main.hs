@@ -38,6 +38,24 @@ data Landscape = Landscape
   }
   deriving (Show)
 
+-- Does the landscape contain the given point?
+landscapeHasPoint :: Landscape -> Point -> Bool
+landscapeHasPoint landscape p = Map.member p (posMap landscape)
+
+-- Returns the neigboring points that are part of the landscape
+landscapeNeighbors :: Landscape -> Point -> [Point]
+landscapeNeighbors landscape p0 = filter (landscapeHasPoint landscape) (neighbors p0)
+
+-- Returns the Char representing the elevation at a point in the landscape
+landscapeElevation :: Landscape -> Point -> Char
+landscapeElevation landscape = charElevation . (posMap landscape Map.!)
+
+-- Returns the elevation of the given character.  Start point and end point are special.
+charElevation :: Char -> Char
+charElevation 'S' = 'a'
+charElevation 'E' = 'z'
+charElevation c = c
+
 -- Returns a map of location to number of moves to get there
 distances :: Landscape -> Map.Map Point Int
 distances landscape =
@@ -47,10 +65,8 @@ distances landscape =
 distancesHelper :: Landscape -> Map.Map Point Int -> [Point] -> Int -> Map.Map Point Int
 distancesHelper landscape mapSoFar toDo dist =
   let candidates0 = concatMap (next landscape) toDo
-      inLandscape p = Map.member p (posMap landscape)
-      candidates1 = filter inLandscape candidates0
       notInMapSoFar p = not (Map.member p mapSoFar)
-      candidates2 = filter notInMapSoFar candidates1
+      candidates2 = filter notInMapSoFar candidates0
       candidates3 = Set.toList (Set.fromList candidates2)
    in if null candidates3
         then mapSoFar
@@ -61,21 +77,14 @@ distancesHelper landscape mapSoFar toDo dist =
 -- Where can you move next, given a landscape
 next :: Landscape -> Point -> [Point]
 next landscape start =
-  filter (canMove landscape start) (neighbors start)
+  filter (canMove landscape start) (landscapeNeighbors landscape start)
 
 -- True if you can move from point A to point B
 canMove :: Landscape -> Point -> Point -> Bool
 canMove landscape a b =
-  Map.member b (posMap landscape)
-    && let ca = getElevation landscape a
-           cb = getElevation landscape b
-        in Char.ord cb <= Char.ord ca + 1
-
--- Returns the Char representing the elevation at a point in the landscape
-getElevation :: Landscape -> Point -> Char
-getElevation landscape point =
-  let c = posMap landscape Map.! point
-   in if c == 'S' then 'a' else if c == 'E' then 'z' else c
+  let ca = landscapeElevation landscape a
+      cb = landscapeElevation landscape b
+   in Char.ord cb <= Char.ord ca + 1
 
 parseInput :: String -> Landscape
 parseInput text =
