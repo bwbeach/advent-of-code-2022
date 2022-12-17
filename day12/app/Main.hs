@@ -2,6 +2,7 @@ module Main where
 
 import qualified Data.Char as Char
 import qualified Data.Map.Strict as Map
+import Data.Maybe (mapMaybe)
 import qualified Data.Set as Set
 
 main :: IO ()
@@ -13,13 +14,24 @@ runInput :: String -> IO ()
 runInput fileName = do
   input <- readFile fileName
   putStrLn fileName
-  print . day12 $ input
+  print . day12a $ input
+  print . day12b $ input
 
-day12 :: String -> Int
-day12 input =
+day12a :: String -> Maybe Int
+day12a input =
   let landscape = parseInput input
-      distMap = distances landscape
-   in distMap Map.! endPos landscape
+   in distanceToEndFrom landscape (startPos landscape)
+
+day12b :: String -> Int
+day12b input =
+  let landscape = parseInput input
+      startPoints = keysForValue 'a' (posMap landscape)
+   in minimum . mapMaybe (distanceToEndFrom landscape) $ startPoints
+
+distanceToEndFrom :: Landscape -> Point -> Maybe Int
+distanceToEndFrom landscape p0 =
+  let distMap = distances landscape p0
+   in Map.lookup (endPos landscape) distMap
 
 data Point = Point Int Int deriving (Eq, Ord, Show)
 
@@ -57,10 +69,10 @@ charElevation 'E' = 'z'
 charElevation c = c
 
 -- Returns a map of location to number of moves to get there
-distances :: Landscape -> Map.Map Point Int
-distances landscape =
-  let mapSoFar = Map.fromList [(startPos landscape, 0)]
-   in distancesHelper landscape mapSoFar [startPos landscape] 1
+distances :: Landscape -> Point -> Map.Map Point Int
+distances landscape p0 =
+  let mapSoFar = Map.fromList [(p0, 0)]
+   in distancesHelper landscape mapSoFar [p0] 1
 
 distancesHelper :: Landscape -> Map.Map Point Int -> [Point] -> Int -> Map.Map Point Int
 distancesHelper landscape mapSoFar toDo dist =
@@ -90,16 +102,16 @@ parseInput :: String -> Landscape
 parseInput text =
   let m = Map.fromList . concat . zipWith parseLine [0 ..] . lines $ text
    in Landscape
-        { startPos = keyForValue 'S' m,
-          endPos = keyForValue 'E' m,
+        { startPos = oneAndOnly (keysForValue 'S' m),
+          endPos = oneAndOnly (keysForValue 'E' m),
           posMap = m
         }
 
 parseLine :: Int -> String -> [(Point, Char)]
 parseLine y = zipWith (\x c -> (Point x y, c)) [0 ..]
 
-keyForValue :: Eq a => Show k => a -> Map.Map k a -> k
-keyForValue a = oneAndOnly . map fst . filter (\(_, v) -> v == a) . Map.assocs
+keysForValue :: Eq a => Show k => a -> Map.Map k a -> [k]
+keysForValue a = map fst . filter (\(_, v) -> v == a) . Map.assocs
 
 oneAndOnly :: [a] -> a
 oneAndOnly [a] = a
