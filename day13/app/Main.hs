@@ -60,7 +60,10 @@ parsePair [a, b] = (parsePacketFromLine a, parsePacketFromLine b)
 parsePair _ = error "bad pair"
 
 parsePacketFromLine :: String -> Packet
-parsePacketFromLine s = fst (parsePacket s)
+parsePacketFromLine s =
+  case parsePacket s of
+    (p, "") -> p
+    _ -> error "didn't parse entire string"
 
 parsePacket :: String -> (Packet, String)
 parsePacket s
