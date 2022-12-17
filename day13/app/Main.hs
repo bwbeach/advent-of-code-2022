@@ -82,12 +82,19 @@ parseList ('[' : s1) =
         _ -> error "bad list"
 parseList _ = error "bad list"
 
+-- Parses the stuff inside the brackets of a list
 parseListInsides :: String -> ([Packet], String)
 parseListInsides s =
   if head s == ']'
     then ([], s)
     else
       let (p, s1) = parsePacket s
-       in if head s1 == ','
-            then let (ps, s2) = parseListInsides (tail s1) in (p : ps, s2)
-            else ([p], s1)
+          (ps, s2) = parseMoreListInsides s1
+       in (p : ps, s2)
+
+-- Parses the stuff following some packets in a list
+parseMoreListInsides :: String -> ([Packet], String)
+parseMoreListInsides s =
+  if head s == ','
+    then parseListInsides (tail s)
+    else ([], s)
