@@ -1,7 +1,9 @@
 module Main where
 
 import Data.Char (isDigit)
+import Data.List (elemIndex, sort)
 import Data.List.Split (splitOn)
+import Data.Maybe (fromJust)
 import Debug.Trace
 
 main :: IO ()
@@ -13,7 +15,8 @@ runInput :: String -> IO ()
 runInput fileName = do
   input <- readFile fileName
   putStrLn fileName
-  print . day13 $ input
+  print . day13a $ input
+  print . day13b $ input
 
 data Packet
   = IntPacket Int
@@ -49,8 +52,20 @@ compareLists (a : as) (b : bs) =
     LT -> LT
     GT -> GT
 
-day13 :: String -> Int
-day13 = sum . map fst . filter snd . zip [1 ..] . map (uncurry (<)) . parseInput
+day13a :: String -> Int
+day13a = sum . map fst . filter snd . zip [1 ..] . map (uncurry (<)) . parseInput
+
+day13b :: String -> Int
+day13b = product . map (+ 1) . elemIndexes dividerPackets . sort . (++ dividerPackets) . concatMap pairToList . parseInput
+
+elemIndexes :: Eq a => [a] -> [a] -> [Int]
+elemIndexes toFind inList = map (\x -> fromJust (elemIndex x inList)) toFind
+
+pairToList :: (a, a) -> [a]
+pairToList (a, b) = [a, b]
+
+dividerPackets :: [Packet]
+dividerPackets = map parsePacketFromLine ["[[2]]", "[[6]]"]
 
 parseInput :: String -> [(Packet, Packet)]
 parseInput = map parsePair . splitOn [""] . lines
