@@ -18,6 +18,7 @@ module Main where
 
 import Data.List.Split (splitOn)
 import qualified Data.Map.Strict as Map
+import Debug.Trace
 import Topograph (pairs)
 
 main :: IO ()
@@ -31,8 +32,32 @@ runInput fileName = do
   putStrLn fileName
   print . day14 $ input
 
-day14 :: String -> State
-day14 = parseInput
+day14 :: String -> Int
+day14 = (\n -> n - 1) . length . traceLast . takeWhile stateNoneFallen . iterate addOneSand . parseInput
+
+traceLast :: Show a => [a] -> [a]
+traceLast states = trace (show (last states)) states
+
+sandDropPoint :: Point
+sandDropPoint = Point 500 0
+
+addOneSand :: State -> State
+addOneSand s = dropOneSandFrom s sandDropPoint
+
+dropOneSandFrom :: State -> Point -> State
+dropOneSandFrom s p =
+  if stateAbovePoint s p
+    then s {fallCount = fallCount s + 1}
+    else case filter (stateEmptyAt s) (dropChoices p) of
+      (p1 : _) -> dropOneSandFrom s p1
+      [] -> s {pointToObject = Map.insert p 'o' (pointToObject s)}
+
+dropChoices :: Point -> [Point]
+dropChoices (Point x y) =
+  [ Point x (y + 1),
+    Point (x - 1) (y + 1),
+    Point (x + 1) (y + 1)
+  ]
 
 data State = State
   { pointToObject :: Map.Map Point Char,
@@ -44,6 +69,17 @@ data State = State
 
 instance Show State where
   show s = "\nx: " ++ show (xRange s) ++ "\ny: " ++ show (yRange s) ++ "\nfallen: " ++ show (fallCount s) ++ "\n" ++ showGrid s
+
+stateEmptyAt :: State -> Point -> Bool
+stateEmptyAt s p = not (Map.member p (pointToObject s))
+
+stateAbovePoint :: State -> Point -> Bool
+stateAbovePoint s (Point _ y) =
+  let Range _ y2 = yRange s
+   in y2 < y
+
+stateNoneFallen :: State -> Bool
+stateNoneFallen s = fallCount s == 0
 
 showGrid :: State -> String
 showGrid s =
