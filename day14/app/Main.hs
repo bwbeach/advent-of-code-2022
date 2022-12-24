@@ -17,8 +17,8 @@ and the number of grains of sand that have fallen off the bottom.
 module Main where
 
 import Data.List.Split (splitOn)
-import qualified Data.Map.Strict as Map
 import Debug.Trace
+import Grid (Grid, Point (..), empty, getWithDefault, insert, member, pointX, pointY)
 import Topograph (pairs)
 
 main :: IO ()
@@ -50,7 +50,7 @@ dropOneSandFrom s p =
     then s {fallCount = fallCount s + 1}
     else case filter (stateEmptyAt s) (dropChoices p) of
       (p1 : _) -> dropOneSandFrom s p1
-      [] -> s {pointToObject = Map.insert p 'o' (pointToObject s)}
+      [] -> s {pointToObject = insert p 'o' (pointToObject s)}
 
 dropChoices :: Point -> [Point]
 dropChoices (Point x y) =
@@ -60,7 +60,7 @@ dropChoices (Point x y) =
   ]
 
 data State = State
-  { pointToObject :: Map.Map Point Char,
+  { pointToObject :: Grid Char,
     xRange :: Range,
     yRange :: Range,
     fallCount :: Int
@@ -71,7 +71,7 @@ instance Show State where
   show s = "\nx: " ++ show (xRange s) ++ "\ny: " ++ show (yRange s) ++ "\nfallen: " ++ show (fallCount s) ++ "\n" ++ showGrid s
 
 stateEmptyAt :: State -> Point -> Bool
-stateEmptyAt s p = not (Map.member p (pointToObject s))
+stateEmptyAt s p = not (member p (pointToObject s))
 
 stateAbovePoint :: State -> Point -> Bool
 stateAbovePoint s (Point _ y) =
@@ -89,33 +89,22 @@ showGrid s =
 showGridLine :: State -> Int -> String
 showGridLine s y =
   let xs = rangeValues (xRange s)
-      m = pointToObject s
-   in map (\x -> Map.findWithDefault ' ' (Point x y) m) xs
+      g = pointToObject s
+   in map (\x -> getWithDefault ' ' (Point x y) g) xs
 
 -- Parses input to produce the initial State
 parseInput :: String -> State
 parseInput text =
   let points = concatMap segmentPoints . concatMap parseLine . lines $ text
    in State
-        { pointToObject = foldl addRock Map.empty points,
-          xRange = collectRange . map getX $ points,
-          yRange = collectRange . map getY $ points,
+        { pointToObject = foldl addRock empty points,
+          xRange = collectRange . map pointX $ points,
+          yRange = collectRange . map pointY $ points,
           fallCount = 0
         }
 
-addRock :: Map.Map Point Char -> Point -> Map.Map Point Char
-addRock m p = Map.insert p '#' m
-
-data Point = Point Int Int deriving (Eq, Ord)
-
-instance Show Point where
-  show (Point x y) = "(" ++ show x ++ "," ++ show y ++ ")"
-
-getX :: Point -> Int
-getX (Point x _) = x
-
-getY :: Point -> Int
-getY (Point _ y) = y
+addRock :: Grid Char -> Point -> Grid Char
+addRock g p = insert p '#' g
 
 data Segment = Segment Point Point deriving (Eq, Ord)
 
