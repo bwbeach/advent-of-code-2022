@@ -12,22 +12,36 @@ import Linear (V2 (..))
 
 main :: IO ()
 main = do
-  runInput "test.txt" 10
-  runInput "input.txt" 2000000
+  runInput "test.txt" 10 20
+  runInput "input.txt" 2000000 4000000
 
-runInput :: String -> Int -> IO ()
-runInput fileName r = do
+runInput :: String -> Int -> Int -> IO ()
+runInput fileName row mapSize = do
   input <- readFile fileName
   putStrLn fileName
-  print . day15 r $ input
+  print . day15a row $ input
+  print . day15b mapSize $ input
 
-day15 :: Int -> String -> Int
-day15 r text =
+day15a :: Int -> String -> Int
+day15a r text =
   let sensors = parseInput text
       covered = makeIntSet (mapMaybe (sensorRangeAtRow r) sensors)
       otherLabels = makeIntSet . map (\p -> let n = pointX p in Range n n) . filter (\p -> pointY p == r) . concatMap sensorPoints $ sensors
       cannotBe = difference covered otherLabels
    in size cannotBe
+
+day15b :: Int -> String -> [Int]
+day15b mapSize text =
+  let sensors = parseInput text
+      allColumns = makeIntSet [Range 0 mapSize]
+      excludedInRow r = makeIntSet (mapMaybe (sensorRangeAtRow r) sensors)
+      couldBeInRow r = difference allColumns (excludedInRow r)
+      pointsInRow r = map (`V2` r) (elements (couldBeInRow r))
+      candidates = concatMap pointsInRow [0 .. mapSize]
+   in map frequency candidates
+
+frequency :: Num a => V2 a -> a
+frequency (V2 x y) = x * 4000000 + y
 
 sensorRangeAtRow :: Int -> Sensor -> Maybe Range
 sensorRangeAtRow y s =
@@ -93,6 +107,10 @@ Range -- an inclusive range of integers
 -- A range of integers
 data Range = Range Int Int deriving (Eq, Ord, Show)
 
+-- What are the elements in a range?
+rangeElements :: Range -> [Int]
+rangeElements (Range low high) = [low .. high]
+
 -- How many numbers are in a range?
 rangeCount :: Range -> Int
 rangeCount (Range low high) = high - low + 1
@@ -120,6 +138,10 @@ newtype IntSet = IntSet [Range] deriving (Show)
 -- Creates a range set from a list of ranges; combines any ranges that overlap
 makeIntSet :: [Range] -> IntSet
 makeIntSet rs = IntSet (mergeRanges . sort $ rs)
+
+-- Returns all of the elements in a set
+elements :: IntSet -> [Int]
+elements (IntSet rs) = concatMap rangeElements rs
 
 -- Union of two sets
 union :: IntSet -> IntSet -> IntSet
