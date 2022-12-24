@@ -7,7 +7,6 @@ module Main where
 import Data.Char (isDigit)
 import Data.List (sort)
 import Data.Maybe (mapMaybe)
-import Debug.Trace (trace)
 import Linear (V2 (..))
 
 main :: IO ()
@@ -97,9 +96,6 @@ nonNumberToSpace c = if isNumberChar c then c else ' '
 isNumberChar :: Char -> Bool
 isNumberChar c = c == '-' || isDigit c
 
-traceIt :: Show a => a -> a
-traceIt x = trace (show x) x
-
 {-
 Range -- an inclusive range of integers
 -}
@@ -128,9 +124,9 @@ combine :: Range -> Range -> Range
 combine (Range l1 h1) (Range l2 h2) = Range (min l1 l2) (max h1 h2)
 
 {-
-RangeSet - a set of ranges, reduced to minimal form.
+IntSet - a set of integers, represented internall as a sequence of ranges.
 
-Minimal form is a sorted list of non-overlapping ranges.
+The ranges are always stored as a sorted list of non-overalpping ranges.
 -}
 
 newtype IntSet = IntSet [Range] deriving (Show)
