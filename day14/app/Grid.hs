@@ -14,13 +14,19 @@ module Grid
     insert,
     member,
     getWithDefault,
+    gridBounds,
     Point (..),
     pointX,
     pointY,
+    Bounds,
+    minX,
+    maxX,
+    minY,
+    maxY,
   )
 where
 
-import qualified Data.Map as M (Map, empty, findWithDefault, insert, member)
+import qualified Data.Map as M (Map, empty, findWithDefault, insert, keys, member)
 
 data Point = Point Int Int deriving (Eq, Ord)
 
@@ -46,3 +52,23 @@ member k (Grid m) = M.member k m
 
 getWithDefault :: a -> Point -> Grid a -> a
 getWithDefault a k (Grid m) = M.findWithDefault a k m
+
+-- Holds the min/max of each coordinate in a Grid
+data Bounds = Bounds
+  { minX :: Int,
+    maxX :: Int,
+    minY :: Int,
+    maxY :: Int
+  }
+  deriving (Eq, Show)
+
+-- Returns the Bounds of a Grid
+gridBounds :: Grid v -> Bounds
+gridBounds (Grid m) =
+  let points = M.keys m
+   in Bounds
+        { minX = minimum (map pointX points),
+          maxX = maximum (map pointX points),
+          minY = minimum (map pointY points),
+          maxY = maximum (map pointY points)
+        }

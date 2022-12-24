@@ -18,13 +18,14 @@ module Main where
 
 import Data.List.Split (splitOn)
 import Debug.Trace
-import Grid (Grid, Point (..), empty, getWithDefault, insert, member, pointX, pointY)
+import Grid
 import Topograph (pairs)
 
 main :: IO ()
 main = do
   runInput "test.txt"
-  runInput "input.txt"
+
+-- runInput "input.txt"
 
 runInput :: String -> IO ()
 runInput fileName = do
@@ -83,14 +84,15 @@ stateNoneFallen s = fallCount s == 0
 
 showGrid :: State -> String
 showGrid s =
-  let ys = rangeValues (yRange s)
-   in unlines . map (showGridLine s) $ ys
+  let g = pointToObject s
+      bounds = gridBounds g
+      xs = [minX bounds .. maxX bounds]
+      ys = [minY bounds .. maxY bounds]
+   in unlines . map (showGridLine g xs) $ ys
 
-showGridLine :: State -> Int -> String
-showGridLine s y =
-  let xs = rangeValues (xRange s)
-      g = pointToObject s
-   in map (\x -> getWithDefault ' ' (Point x y) g) xs
+showGridLine :: Grid Char -> [Int] -> Int -> [Char]
+showGridLine g xs y =
+  map (\x -> getWithDefault ' ' (Point x y) g) xs
 
 -- Parses input to produce the initial State
 parseInput :: String -> State
