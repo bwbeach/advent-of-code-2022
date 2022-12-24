@@ -34,7 +34,12 @@ runInput fileName = do
   print . day14 $ input
 
 day14 :: String -> Int
-day14 = (\n -> n - 1) . length . traceLast . takeWhile stateNoneFallen . iterate addOneSand . parseInput
+day14 text =
+  let s0 = parseInput text
+      g0 = pointToObject s0
+      bottomY = maxY (gridBounds g0)
+      s1 = s0 {fallThreshold = Just (2 + bottomY)}
+   in (\n -> n - 1) . length . traceLast . takeWhile stateNoneFallen . iterate addOneSand $ s1
 
 traceLast :: Show a => [a] -> [a]
 traceLast states = trace (show (last states)) states
@@ -47,7 +52,7 @@ addOneSand s = dropOneSandFrom s sandDropPoint
 
 dropOneSandFrom :: State -> Point -> State
 dropOneSandFrom s p =
-  if stateAbovePoint s p
+  if sandHasFallen s p
     then s {fallCount = fallCount s + 1}
     else case filter (stateEmptyAt s) (dropChoices p) of
       (p1 : _) -> dropOneSandFrom s p1
@@ -62,25 +67,25 @@ dropChoices (Point x y) =
 
 data State = State
   { pointToObject :: Grid Char,
-    xRange :: Range,
-    yRange :: Range,
+    fallThreshold :: Maybe Int,
     fallCount :: Int
   }
   deriving (Eq)
 
 instance Show State where
-  show s = "\nx: " ++ show (xRange s) ++ "\ny: " ++ show (yRange s) ++ "\nfallen: " ++ show (fallCount s) ++ "\n" ++ showGrid s
+  show s = "fallen: " ++ show (fallCount s) ++ "\n" ++ showGrid s
 
 stateEmptyAt :: State -> Point -> Bool
 stateEmptyAt s p = not (member p (pointToObject s))
 
-stateAbovePoint :: State -> Point -> Bool
-stateAbovePoint s (Point _ y) =
-  let Range _ y2 = yRange s
-   in y2 < y
-
 stateNoneFallen :: State -> Bool
 stateNoneFallen s = fallCount s == 0
+
+sandHasFallen :: State -> Point -> Bool
+sandHasFallen s p =
+  case fallThreshold s of
+    Nothing -> False
+    Just n -> n < pointY p
 
 showGrid :: State -> String
 showGrid s =
@@ -100,8 +105,7 @@ parseInput text =
   let points = concatMap segmentPoints . concatMap parseLine . lines $ text
    in State
         { pointToObject = foldl addRock empty points,
-          xRange = collectRange . map pointX $ points,
-          yRange = collectRange . map pointY $ points,
+          fallThreshold = Nothing,
           fallCount = 0
         }
 
