@@ -1,3 +1,7 @@
+{-
+Advent of Code 2022, Day 15
+-}
+
 module Main where
 
 import Data.Char (isDigit)
@@ -5,14 +9,6 @@ import Data.List (sort)
 import Data.Maybe (mapMaybe)
 import Debug.Trace (trace)
 import Linear (V2 (..))
-
-type Point = V2 Int
-
-pointX :: Point -> Int
-pointX (V2 x _) = x
-
-pointY :: Point -> Int
-pointY (V2 _ y) = y
 
 main :: IO ()
 main = do
@@ -33,11 +29,6 @@ day15 r text =
       ranges1 = foldl removeFromRanges ranges0 toRemove
    in sum . map rangeCount . traceIt . mergeRanges . traceIt . sort $ ranges1
 
-data Sensor = Sensor {sensorPos :: Point, beaconPos :: Point} deriving (Eq, Show)
-
-sensorPoints :: Sensor -> [Point]
-sensorPoints s = [sensorPos s, beaconPos s]
-
 sensorRangeAtRow :: Int -> Sensor -> Maybe Range
 sensorRangeAtRow y s =
   let sensorToBeacon = manhattan (sensorPos s) (beaconPos s)
@@ -49,8 +40,31 @@ sensorRangeAtRow y s =
         then Nothing
         else Just (Range (sensorX - radius) (sensorX + radius))
 
+{-
+Point -- names a location on the grid
+-}
+
+type Point = V2 Int
+
+pointX :: Point -> Int
+pointX (V2 x _) = x
+
+pointY :: Point -> Int
+pointY (V2 _ y) = y
+
+-- Return the Manhattan distance between two points
 manhattan :: Point -> Point -> Int
-manhattan p1 p2 = abs (pointX p1 - pointX p2) + abs (pointY p1 - pointY p2)
+manhattan (V2 x1 y1) (V2 x2 y2) = abs (x1 - x2) + abs (y1 - y2)
+
+{-
+Sensor -- holds the information reported by one sensor
+-}
+
+data Sensor = Sensor {sensorPos :: Point, beaconPos :: Point} deriving (Eq, Show)
+
+-- Returns the two points this sensor shows on the grid: 'S' and 'B'
+sensorPoints :: Sensor -> [Point]
+sensorPoints s = [sensorPos s, beaconPos s]
 
 -- Converts input text to a list of sensors
 parseInput :: String -> [Sensor]
@@ -72,6 +86,10 @@ isNumberChar c = c == '-' || isDigit c
 traceIt :: Show a => a -> a
 traceIt x = trace (show x) x
 
+{-
+Range -- an inclusive range of integers
+-}
+
 -- A range of integers
 data Range = Range Int Int deriving (Eq, Ord, Show)
 
@@ -87,14 +105,6 @@ rangeIncludes (Range low high) n = low <= n && n <= high
 overlaps :: Range -> Range -> Bool
 overlaps (Range l1 h1) (Range l2 h2) = l1 <= h2 && l2 <= h1
 
--- Combines ranges if they overlap.  Assumes input is sorted
-mergeRanges :: [Range] -> [Range]
-mergeRanges [] = []
-mergeRanges [r] = [r]
-mergeRanges (r0 : r1 : rs)
-  | overlaps r0 r1 = mergeRanges (combine r0 r1 : rs)
-  | otherwise = r0 : mergeRanges (r1 : rs)
-
 -- Combines a pair of ranges that overlap
 combine :: Range -> Range -> Range
 combine (Range l1 h1) (Range l2 h2) = Range (min l1 l2) (max h1 h2)
@@ -105,9 +115,48 @@ removeFromRanges rs n = concatMap (`removeFromRange` n) rs
 
 -- Removes a given value from a range
 removeFromRange :: Range -> Int -> [Range]
-removeFromRange (Range low high) n
-  | low == n && high == n = []
-  | low == n = [Range (low + 1) high]
-  | high == n = [Range low (high - 1)]
-  | low < n && n < high = [Range low (n - 1), Range (n + 1) high]
-  | otherwise = [Range low high]
+removeFromRange r n = rangeDifference r (Range n n)
+
+{-
+RangeSet - a set of ranges, reduced to minimal form.
+
+Minimal form is a sorted list of non-overlapping ranges.
+-}
+
+newtype IntSet = IntSet [Range] deriving (Show)
+
+-- Creates a range set from a list of ranges; combines any ranges that overlap
+makeIntSet :: [Range] -> IntSet
+makeIntSet rs = IntSet (mergeRanges . sort $ rs)
+
+-- Union of two sets
+union :: IntSet -> IntSet -> IntSet
+union (IntSet rs1) (IntSet rs2) = makeIntSet (rs1 ++ rs2)
+
+-- Difference of two sets
+difference :: IntSet -> IntSet -> IntSet
+difference (IntSet rs1) (IntSet rs2) = IntSet (rangesDifference rs1 rs2)
+
+-- Differencs between two lists of ranges
+rangesDifference :: [Range] -> [Range] -> [Range]
+rangesDifference rs [] = rs
+rangesDifference [] _ = []
+rangesDifference (r : rs) (x : xs)
+  | overlaps r x = rangesDifference (rangeDifference r x ++ rs) (x : xs)
+  | x < r = rangesDifference (r : rs) xs
+  | otherwise = r : rangesDifference rs (x : xs)
+
+-- Returns the list of ranges describing whats left after removing all points in the second range from the first
+rangeDifference :: Range -> Range -> [Range]
+rangeDifference (Range l1 h1) (Range l2 h2) =
+  if overlaps (Range l1 h1) (Range l2 h2)
+    then [Range l1 (l2 - 1) | l1 < l2] ++ [Range (h2 + 1) h1 | h2 < h1]
+    else [Range l1 h1]
+
+-- Combines ranges if they overlap.  Assumes input is sorted
+mergeRanges :: [Range] -> [Range]
+mergeRanges [] = []
+mergeRanges [r] = [r]
+mergeRanges (r0 : r1 : rs)
+  | overlaps r0 r1 = mergeRanges (combine r0 r1 : rs)
+  | otherwise = r0 : mergeRanges (r1 : rs)
