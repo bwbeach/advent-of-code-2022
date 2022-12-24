@@ -24,10 +24,10 @@ runInput fileName r = do
 day15 :: Int -> String -> Int
 day15 r text =
   let sensors = parseInput text
-      ranges0 = mapMaybe (sensorRangeAtRow r) sensors
-      toRemove = traceIt . map pointX . filter (\p -> pointY p == r) . concatMap sensorPoints $ sensors
-      ranges1 = foldl removeFromRanges ranges0 toRemove
-   in sum . map rangeCount . traceIt . mergeRanges . traceIt . sort $ ranges1
+      covered = makeIntSet (mapMaybe (sensorRangeAtRow r) sensors)
+      otherLabels = makeIntSet . map (\p -> let n = pointX p in Range n n) . filter (\p -> pointY p == r) . concatMap sensorPoints $ sensors
+      cannotBe = difference covered otherLabels
+   in size cannotBe
 
 sensorRangeAtRow :: Int -> Sensor -> Maybe Range
 sensorRangeAtRow y s =
@@ -109,14 +109,6 @@ overlaps (Range l1 h1) (Range l2 h2) = l1 <= h2 && l2 <= h1
 combine :: Range -> Range -> Range
 combine (Range l1 h1) (Range l2 h2) = Range (min l1 l2) (max h1 h2)
 
--- Removes a number from every range given
-removeFromRanges :: [Range] -> Int -> [Range]
-removeFromRanges rs n = concatMap (`removeFromRange` n) rs
-
--- Removes a given value from a range
-removeFromRange :: Range -> Int -> [Range]
-removeFromRange r n = rangeDifference r (Range n n)
-
 {-
 RangeSet - a set of ranges, reduced to minimal form.
 
@@ -136,6 +128,10 @@ union (IntSet rs1) (IntSet rs2) = makeIntSet (rs1 ++ rs2)
 -- Difference of two sets
 difference :: IntSet -> IntSet -> IntSet
 difference (IntSet rs1) (IntSet rs2) = IntSet (rangesDifference rs1 rs2)
+
+-- Number of elements of an IntSet
+size :: IntSet -> Int
+size (IntSet rs) = sum . map rangeCount $ rs
 
 -- Differencs between two lists of ranges
 rangesDifference :: [Range] -> [Range] -> [Range]
