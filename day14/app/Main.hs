@@ -24,22 +24,30 @@ import Topograph (pairs)
 main :: IO ()
 main = do
   runInput "test.txt"
-
--- runInput "input.txt"
+  runInput "input.txt"
 
 runInput :: String -> IO ()
 runInput fileName = do
   input <- readFile fileName
   putStrLn fileName
-  print . day14 $ input
+  print . day14a $ input
+  print . day14b $ input
 
-day14 :: String -> Int
-day14 text =
+day14a :: String -> Int
+day14a text =
   let s0 = parseInput text
       g0 = pointToObject s0
       bottomY = maxY (gridBounds g0)
       s1 = s0 {fallThreshold = Just (2 + bottomY)}
    in (\n -> n - 1) . length . traceLast . takeWhile stateNoneFallen . iterate addOneSand $ s1
+
+day14b :: String -> Int
+day14b text =
+  let s0 = parseInput text
+      g0 = pointToObject s0
+      bottomY = maxY (gridBounds g0)
+      s1 = s0 {groundLevel = Just (2 + bottomY)}
+   in length . traceLast . takeWhile stateStartPointEmpty . iterate addOneSand $ s1
 
 traceLast :: Show a => [a] -> [a]
 traceLast states = trace (show (last states)) states
@@ -51,10 +59,10 @@ addOneSand :: State -> State
 addOneSand s = dropOneSandFrom s sandDropPoint
 
 dropOneSandFrom :: State -> Point -> State
-dropOneSandFrom s p =
-  if sandHasFallen s p
-    then s {fallCount = fallCount s + 1}
-    else case filter (stateEmptyAt s) (dropChoices p) of
+dropOneSandFrom s p
+  | sandHasFallen s p = s {fallCount = fallCount s + 1}
+  | sandOnGround s p = s {pointToObject = insert p 'o' (pointToObject s)}
+  | otherwise = case filter (stateEmptyAt s) (dropChoices p) of
       (p1 : _) -> dropOneSandFrom s p1
       [] -> s {pointToObject = insert p 'o' (pointToObject s)}
 
@@ -68,6 +76,7 @@ dropChoices (Point x y) =
 data State = State
   { pointToObject :: Grid Char,
     fallThreshold :: Maybe Int,
+    groundLevel :: Maybe Int,
     fallCount :: Int
   }
   deriving (Eq)
@@ -81,11 +90,20 @@ stateEmptyAt s p = not (member p (pointToObject s))
 stateNoneFallen :: State -> Bool
 stateNoneFallen s = fallCount s == 0
 
+stateStartPointEmpty :: State -> Bool
+stateStartPointEmpty s = not (member sandDropPoint (pointToObject s))
+
 sandHasFallen :: State -> Point -> Bool
 sandHasFallen s p =
   case fallThreshold s of
     Nothing -> False
     Just n -> n < pointY p
+
+sandOnGround :: State -> Point -> Bool
+sandOnGround s p =
+  case groundLevel s of
+    Nothing -> False
+    Just n -> n - 1 <= pointY p
 
 showGrid :: State -> String
 showGrid s =
@@ -106,6 +124,7 @@ parseInput text =
    in State
         { pointToObject = foldl addRock empty points,
           fallThreshold = Nothing,
+          groundLevel = Nothing,
           fallCount = 0
         }
 
