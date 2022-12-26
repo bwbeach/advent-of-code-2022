@@ -55,7 +55,7 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules:  MyLib, PriorityQueue
+    exposed-modules:  Dijkstra, MyLib, PriorityQueue
 
     -- Modules included in this library but not exported.
     -- other-modules:

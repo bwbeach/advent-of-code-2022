@@ -10,17 +10,21 @@ NOTE: Because we use a set for storage, the queue cannot contain
 two identical elements.
 -}
 
-module PriorityQueue (PriorityQueue, delete, empty, insert, null, peek, size) where
+module PriorityQueue (PriorityQueue, delete, empty, fromList, insert, null, peek, size) where
 
 import Prelude hiding (null)
-import qualified Data.Set as S (Set, delete, empty, insert, size, toList, null)
+import qualified Data.Set as S (Set, delete, empty, fromList, insert, size, toList, null)
 
 -- | PriorityQueue is a wrapper for a Set
-newtype Ord a => PriorityQueue a = PriorityQueue (S.Set a)
+newtype Ord a => PriorityQueue a = PriorityQueue (S.Set a) deriving (Eq, Show)
 
 -- | The empty PriorityQueue
 empty :: Ord a => PriorityQueue a
 empty = PriorityQueue S.empty
+
+-- | Makes a PriorityQueue containing all of the items in the list 
+fromList :: Ord a => [a] -> PriorityQueue a 
+fromList as = PriorityQueue (S.fromList as)
 
 -- | The number of elements in a priority queue
 size :: Ord a => PriorityQueue a -> Int

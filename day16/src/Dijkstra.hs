@@ -1,9 +1,11 @@
 -- | Dijkstra's algorithm for computing distance matrix for a graph.
-module Dijkstra (distances) where
+--
+-- TODO: put everything but `distances` in an "Internal" module.
+module Dijkstra (distances, State, initialState, stateFromLists, updateDistance) where
 
 import qualified Data.Map.Strict as M (Map, empty, fromList, insert, lookup)
 import qualified Data.Set as S (Set, empty, insert, member)
-import qualified PriorityQueue as PQ (PriorityQueue, delete, empty, insert, null, peek)
+import qualified PriorityQueue as PQ (PriorityQueue, delete, empty, fromList, insert, null, peek)
 
 -- | Given a list of nodes and a function that returns a node's (neighbors, cost) pairs,
 --   returns a function that returns the cost to go from one node to another.
@@ -58,6 +60,10 @@ data State a = State
   { unvisited :: PQ.PriorityQueue (Int, a),
     nodeToDistance :: M.Map a Int
   }
+  deriving (Eq, Show)
+
+stateFromLists :: Ord a => [(Int, a)] -> [(a, Int)] -> State a
+stateFromLists u ntd = State {unvisited = PQ.fromList u, nodeToDistance = M.fromList ntd}
 
 initialState start =
   State
@@ -79,7 +85,9 @@ takeNextUnvisited s =
 
 -- | Update the distance to a node
 --
--- Updates both data structures inside the state
+-- Updating the distance to a node adds it to the unvisited list
+-- if it wasn't there before.  If it was there before, it's priority
+-- changes based on the new distance.
 updateDistance :: Ord a => a -> Int -> State a -> State a
 updateDistance n d s =
   let -- get the initial state of the two structures

@@ -1,6 +1,7 @@
 module Main (main) where
 
 import Data.Maybe (fromJust)
+import qualified Dijkstra as D
 import qualified PriorityQueue as PQ (PriorityQueue, delete, empty, insert, null, peek, size)
 import qualified System.Exit as Exit
 import Test.HUnit (Test (..), assertEqual, failures, runTestTT)
@@ -10,8 +11,12 @@ main = do
   result <- runTestTT tests
   if failures result > 0 then Exit.exitFailure else Exit.exitSuccess
 
-test1 :: Test
-test1 = TestCase (assertEqual "size of empty set should be 0" 0 (PQ.size (PQ.empty :: PQ.PriorityQueue Int)))
+--
+-- PriorityQueue
+--
+
+testEmpty :: Test
+testEmpty = TestCase (assertEqual "size of empty set should be 0" 0 (PQ.size (PQ.empty :: PQ.PriorityQueue Int)))
 
 testInsert :: Test
 testInsert =
@@ -31,10 +36,34 @@ testDequeue =
   let empty = PQ.empty :: PQ.PriorityQueue Int
    in TestCase (assertEqual "items should be dequeued in order" [1, 2, 3, 4, 5] (dequeueAll (insertAll [3, 2, 4, 5, 1] empty)))
 
+--
+-- State
+--
+
+testEmptyState :: Test
+testEmptyState =
+  let expected = D.stateFromLists [(0, "start")] [("start", 0)]
+      actual = D.initialState "start"
+   in TestCase (assertEqual "empty state" expected actual)
+
+testUpdateDistance :: Test
+testUpdateDistance =
+  let expected = D.stateFromLists [(0, "s"), (7, "a"), (9, "b")] [("a", 7), ("b", 9), ("s", 0)]
+      actual = D.updateDistance "a" 7 . D.updateDistance "b" 9 . D.updateDistance "a" 10 $ D.initialState "s"
+   in TestCase (assertEqual "update state" expected actual)
+
+--
+-- TEST LIST
+--
+
 tests :: Test
 tests =
   TestList
-    [ TestLabel "emptySet" test1,
+    [ -- PriorityQueue
+      TestLabel "emptySet" testEmpty,
       testInsert,
-      testDequeue
+      testDequeue,
+      -- State
+      testEmptyState,
+      testUpdateDistance
     ]
