@@ -1,5 +1,6 @@
 module Main (main) where
 
+import qualified Data.Map.Strict as M
 import Data.Maybe (fromJust)
 import qualified Dijkstra as D
 import qualified PriorityQueue as PQ (PriorityQueue, delete, empty, insert, null, peek, size)
@@ -53,6 +54,22 @@ testUpdateDistance =
    in TestCase (assertEqual "update state" expected actual)
 
 --
+-- dijkstra
+--
+
+testDistances :: Test
+testDistances =
+  let expected = M.fromList [(("a", "a"), 0), (("a", "b"), 1), (("a", "c"), 3), (("b", "b"), 0), (("b", "c"), 2)]
+      actual = D.buildMatrix ["a", "b"] testGraph1
+   in TestCase (assertEqual "dijkstra results" expected actual)
+
+testGraph1 :: String -> [(String, Int)]
+testGraph1 "a" = [("b", 1), ("c", 99)]
+testGraph1 "b" = [("c", 2)]
+testGraph1 "c" = []
+testGraph1 n = error ("unknown node " ++ show n)
+
+--
 -- TEST LIST
 --
 
@@ -61,9 +78,10 @@ tests =
   TestList
     [ -- PriorityQueue
       TestLabel "emptySet" testEmpty,
-      testInsert,
+      TestLabel "insert" testInsert,
       testDequeue,
       -- State
-      testEmptyState,
-      testUpdateDistance
+      TestLabel "testEmptyState" testEmptyState,
+      TestLabel "testUpdateDistance" testUpdateDistance,
+      TestLabel "testDistances" testDistances
     ]

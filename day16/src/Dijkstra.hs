@@ -1,28 +1,33 @@
 -- | Dijkstra's algorithm for computing distance matrix for a graph.
 --
 -- TODO: put everything but `distances` in an "Internal" module.
-module Dijkstra (distances, State, initialState, stateFromLists, updateDistance) where
+module Dijkstra (distances, buildMatrix, State, initialState, stateFromLists, updateDistance) where
 
-import qualified Data.Map.Strict as M (Map, empty, fromList, insert, lookup)
-import qualified Data.Set as S (Set, empty, insert, member)
-import qualified PriorityQueue as PQ (PriorityQueue, delete, empty, fromList, insert, null, peek)
+import qualified Data.Map.Strict as M (Map, empty, fromList, insert, lookup, toList)
+import Debug.Trace
+import qualified PriorityQueue as PQ (PriorityQueue, delete, empty, fromList, insert, peek)
 
 -- | Given a list of nodes and a function that returns a node's (neighbors, cost) pairs,
 --   returns a function that returns the cost to go from one node to another.
 --
 --   The cost of going from a nod to itself is always 0.
-distances :: Ord a => [a] -> (a -> [(a, Int)]) -> (a -> a -> Maybe Int)
+distances :: (Ord a, Show a) => [a] -> (a -> [(a, Int)]) -> (a -> a -> Maybe Int)
 distances ns getNeighbors = getDistance (buildMatrix ns getNeighbors)
 
 -- | Returns the cost to go from node `a` to node `b`, if there is a path.
+--
+-- First argument is the map that has all of the data in it.
 getDistance :: Ord a => M.Map (a, a) Int -> a -> a -> Maybe Int
 getDistance m a b = M.lookup (a, b) m
 
 -- | Builds the matrix of distances
+buildMatrix :: (Ord a, Show a) => [a] -> (a -> [(a, Int)]) -> M.Map (a, a) Int
 buildMatrix ns getNeighbors = M.fromList (concatMap (buildEntriesForNode getNeighbors) ns)
 
-buildEntriesForNode :: p1 -> p2 -> [a]
-buildEntriesForNode getNeighbors n = [] -- build getNeighbers n
+buildEntriesForNode :: (Ord a, Show a) => (a -> [(a, Int)]) -> a -> [((a, a), Int)]
+buildEntriesForNode getNeighbors start =
+  let entriesFromStart = dijkstra (initialState start) getNeighbors
+   in map (\(b, d) -> ((start, b), d)) entriesFromStart
 
 -- | Recursive implementation of Dijkstra's algorithm
 --
@@ -32,23 +37,22 @@ buildEntriesForNode getNeighbors n = [] -- build getNeighbers n
 --   The `nodeToDistance` is a map from node to (possibly tentative) distance.
 --
 --   Both data structures must always be updated together.
-dijkstra :: (Ord a) => State a -> (a -> [(a, Int)]) -> [(a, Int)]
+dijkstra :: (Ord a, Show a) => State a -> (a -> [(a, Int)]) -> [(a, Int)]
 dijkstra state0 getNeighbors =
-  case peekNextUnvisited state0 of
-    Nothing -> makeEntries nodeToDistance
+  case traceIt "PPP" (peekNextUnvisited (traceIt "SSS" state0)) of
+    Nothing -> M.toList (nodeToDistance state0)
     Just (d, n) ->
       let state1 = deleteUnvisited (d, n) state0
           neighbors = getNeighbors n
           state2 = foldl (updateNeighbor d) state1 neighbors
-       in []
+       in dijkstra state2 getNeighbors
+
+traceIt :: Show a => String -> a -> a
+traceIt label x = trace (label ++ " " ++ show x) x
 
 updateNeighbor :: Ord a => Int -> State a -> (a, Int) -> State a
 updateNeighbor d0 state (n, d) =
   updateDistance n (d0 + d) state
-
--- TODO
-makeEntries :: p -> [a]
-makeEntries _ = []
 
 -- | State of Dijkstra's algorithm
 --
@@ -63,8 +67,14 @@ data State a = State
   deriving (Eq, Show)
 
 stateFromLists :: Ord a => [(Int, a)] -> [(a, Int)] -> State a
-stateFromLists u ntd = State {unvisited = PQ.fromList u, nodeToDistance = M.fromList ntd}
+stateFromLists u ntd =
+  State
+    { unvisited = PQ.fromList u,
+      nodeToDistance = M.fromList ntd
+    }
 
+-- | Initial state, with the starting node at distance 0 on the unvisited list
+initialState :: Ord a => a -> State a
 initialState start =
   State
     { unvisited = PQ.insert (0, start) PQ.empty,
@@ -76,12 +86,6 @@ peekNextUnvisited s = PQ.peek (unvisited s)
 
 deleteUnvisited :: Ord a => (Int, a) -> State a -> State a
 deleteUnvisited item s = s {unvisited = PQ.delete item (unvisited s)}
-
-takeNextUnvisited :: Ord a => State a -> (Maybe (Int, a), State a)
-takeNextUnvisited s =
-  case PQ.peek (unvisited s) of
-    Nothing -> (Nothing, s)
-    Just item -> (Just item, s {unvisited = PQ.delete item (unvisited s)})
 
 -- | Update the distance to a node
 --
@@ -101,5 +105,3 @@ updateDistance n d s =
       u2 = PQ.insert (d, n) u1
       ntd2 = M.insert n d ntd0
    in s {unvisited = u2, nodeToDistance = ntd2}
-
--- makeEntries nodeToDistance = []
