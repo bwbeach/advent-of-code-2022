@@ -43,7 +43,7 @@ testDequeue =
 --
 
 testGraph1 :: DG.DGraph String Int
-testGraph1 = DG.fromArcsList [GT.Arc "a" "b" 1, GT.Arc "a" "c" 99, GT.Arc "b" "c" 2]
+testGraph1 = DG.fromArcsList [GT.Arc "a" "b" 1, GT.Arc "a" "c" 99, GT.Arc "b" "a" 4, GT.Arc "b" "c" 2]
 
 testDistances :: Test
 testDistances =
@@ -52,6 +52,7 @@ testDistances =
           [ GT.Arc "a" "a" 0,
             GT.Arc "a" "b" 1,
             GT.Arc "a" "c" 3,
+            GT.Arc "b" "a" 4,
             GT.Arc "b" "b" 0,
             GT.Arc "b" "c" 2,
             GT.Arc "c" "c" 0

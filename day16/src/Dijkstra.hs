@@ -46,7 +46,7 @@ arcDestAndCost (GT.Arc _ v e) = (v, e)
 
 updateNeighbor :: Ord a => Int -> State a -> (a, Int) -> State a
 updateNeighbor d0 state (n, d) =
-  updateDistance n (d0 + d) state
+  updateIfCloser n (d0 + d) state
 
 -- | State of Dijkstra's algorithm
 --
@@ -75,6 +75,19 @@ peekNextUnvisited s = PQ.peek (unvisited s)
 -- | Deletes one of the unvisited nodes.
 deleteUnvisited :: Ord a => (Int, a) -> State a -> State a
 deleteUnvisited item s = s {unvisited = PQ.delete item (unvisited s)}
+
+-- | Updates the distance to a node if the new distances is closer.
+updateIfCloser :: Ord a => a -> Int -> State a -> State a
+updateIfCloser n d s =
+  if isCloser n d s
+    then updateDistance n d s
+    else s
+
+isCloser :: Ord k => k -> Int -> State k -> Bool
+isCloser n d s =
+  case M.lookup n (nodeToDistance s) of
+    Nothing -> True
+    Just d' -> d < d'
 
 -- | Update the distance to a node
 --
