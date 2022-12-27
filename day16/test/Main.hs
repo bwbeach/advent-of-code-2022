@@ -58,11 +58,8 @@ testUpdateDistance =
 -- dijkstra
 --
 
-testGraph1 :: String -> [(String, Int)]
-testGraph1 "a" = [("b", 1), ("c", 99)]
-testGraph1 "b" = [("c", 2)]
-testGraph1 "c" = []
-testGraph1 n = error ("unknown node " ++ show n)
+testGraph1 :: DG.DGraph String Int
+testGraph1 = DG.fromArcsList [GT.Arc "a" "b" 1, GT.Arc "a" "c" 99, GT.Arc "b" "c" 2]
 
 testDistances :: Test
 testDistances =
@@ -75,7 +72,7 @@ testDistances =
             GT.Arc "b" "c" 2,
             GT.Arc "c" "c" 0
           ]
-      actual = D.distances ["a", "b", "c"] testGraph1
+      actual = D.distances testGraph1
    in TestCase (assertEqual "dijkstra" expected actual)
 
 --

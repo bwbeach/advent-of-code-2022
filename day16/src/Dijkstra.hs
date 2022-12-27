@@ -1,7 +1,7 @@
 -- | Dijkstra's algorithm for computing distance matrix for a graph.
 --
 -- TODO: put everything but `distances` in an "Internal" module.
-module Dijkstra (distances, buildMatrix, State, initialState, stateFromLists, updateDistance) where
+module Dijkstra (distances, State, initialState, stateFromLists, updateDistance) where
 
 import qualified Data.Graph.DGraph as DG
 import qualified Data.Graph.Types as GT
@@ -14,16 +14,16 @@ import qualified PriorityQueue as PQ (PriorityQueue, delete, empty, fromList, in
 --   returns a function that returns the cost to go from one node to another.
 --
 --   The cost of going from a node to itself is always 0.
-distances :: (Ord a, Show a, Hashable a) => [a] -> (a -> [(a, Int)]) -> DG.DGraph a Int
-distances ns getNeighbors = DG.fromArcsList (buildMatrix ns getNeighbors)
+distances :: (Ord a, Show a, Hashable a) => DG.DGraph a Int -> DG.DGraph a Int
+distances g = DG.fromArcsList (buildArcs g)
 
 -- | Builds the matrix of distances
-buildMatrix :: (Ord a, Show a) => [a] -> (a -> [(a, Int)]) -> [GT.Arc a Int]
-buildMatrix ns getNeighbors = concatMap (buildEntriesForNode getNeighbors) ns
+buildArcs :: (Ord a, Show a, Hashable a) => DG.DGraph a Int -> [GT.Arc a Int]
+buildArcs g = concatMap (buildArcsFromNode g) (GT.vertices g)
 
-buildEntriesForNode :: (Ord a, Show a) => (a -> [(a, Int)]) -> a -> [GT.Arc a Int]
-buildEntriesForNode getNeighbors start =
-  let entriesFromStart = dijkstra (initialState start) getNeighbors
+buildArcsFromNode :: (Ord a, Show a, Hashable a) => DG.DGraph a Int -> a -> [GT.Arc a Int]
+buildArcsFromNode g start =
+  let entriesFromStart = dijkstra g (initialState start)
    in map (uncurry (GT.Arc start)) entriesFromStart
 
 -- | Recursive implementation of Dijkstra's algorithm
@@ -34,15 +34,18 @@ buildEntriesForNode getNeighbors start =
 --   The `nodeToDistance` is a map from node to (possibly tentative) distance.
 --
 --   Both data structures must always be updated together.
-dijkstra :: (Ord a, Show a) => State a -> (a -> [(a, Int)]) -> [(a, Int)]
-dijkstra state0 getNeighbors =
+dijkstra :: (Ord a, Show a, Hashable a) => DG.DGraph a Int -> State a -> [(a, Int)]
+dijkstra g state0 =
   case traceIt "PPP" (peekNextUnvisited (traceIt "SSS" state0)) of
     Nothing -> M.toList (nodeToDistance state0)
     Just (d, n) ->
       let state1 = deleteUnvisited (d, n) state0
-          neighbors = getNeighbors n
+          neighbors = map arcDestAndCost (DG.outboundingArcs g n)
           state2 = foldl (updateNeighbor d) state1 neighbors
-       in dijkstra state2 getNeighbors
+       in dijkstra g state2
+
+arcDestAndCost :: GT.Arc v e -> (v, e)
+arcDestAndCost (GT.Arc _ v e) = (v, e)
 
 traceIt :: Show a => String -> a -> a
 traceIt label x = trace (label ++ " " ++ show x) x
