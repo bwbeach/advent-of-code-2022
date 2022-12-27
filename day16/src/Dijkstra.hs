@@ -3,6 +3,9 @@
 -- TODO: put everything but `distances` in an "Internal" module.
 module Dijkstra (distances, buildMatrix, State, initialState, stateFromLists, updateDistance) where
 
+import qualified Data.Graph.DGraph as DG
+import qualified Data.Graph.Types as GT
+import Data.Hashable (Hashable)
 import qualified Data.Map.Strict as M (Map, empty, fromList, insert, lookup, toList)
 import Debug.Trace
 import qualified PriorityQueue as PQ (PriorityQueue, delete, empty, fromList, insert, peek)
@@ -10,24 +13,18 @@ import qualified PriorityQueue as PQ (PriorityQueue, delete, empty, fromList, in
 -- | Given a list of nodes and a function that returns a node's (neighbors, cost) pairs,
 --   returns a function that returns the cost to go from one node to another.
 --
---   The cost of going from a nod to itself is always 0.
-distances :: (Ord a, Show a) => [a] -> (a -> [(a, Int)]) -> (a -> a -> Maybe Int)
-distances ns getNeighbors = getDistance (buildMatrix ns getNeighbors)
-
--- | Returns the cost to go from node `a` to node `b`, if there is a path.
---
--- First argument is the map that has all of the data in it.
-getDistance :: Ord a => M.Map (a, a) Int -> a -> a -> Maybe Int
-getDistance m a b = M.lookup (a, b) m
+--   The cost of going from a node to itself is always 0.
+distances :: (Ord a, Show a, Hashable a) => [a] -> (a -> [(a, Int)]) -> DG.DGraph a Int
+distances ns getNeighbors = DG.fromArcsList (buildMatrix ns getNeighbors)
 
 -- | Builds the matrix of distances
-buildMatrix :: (Ord a, Show a) => [a] -> (a -> [(a, Int)]) -> M.Map (a, a) Int
-buildMatrix ns getNeighbors = M.fromList (concatMap (buildEntriesForNode getNeighbors) ns)
+buildMatrix :: (Ord a, Show a) => [a] -> (a -> [(a, Int)]) -> [GT.Arc a Int]
+buildMatrix ns getNeighbors = concatMap (buildEntriesForNode getNeighbors) ns
 
-buildEntriesForNode :: (Ord a, Show a) => (a -> [(a, Int)]) -> a -> [((a, a), Int)]
+buildEntriesForNode :: (Ord a, Show a) => (a -> [(a, Int)]) -> a -> [GT.Arc a Int]
 buildEntriesForNode getNeighbors start =
   let entriesFromStart = dijkstra (initialState start) getNeighbors
-   in map (\(b, d) -> ((start, b), d)) entriesFromStart
+   in map (uncurry (GT.Arc start)) entriesFromStart
 
 -- | Recursive implementation of Dijkstra's algorithm
 --

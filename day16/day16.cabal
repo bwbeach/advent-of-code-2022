@@ -64,7 +64,7 @@ library
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.16.3.0, containers
+    build-depends:    base ^>=4.16.3.0, containers, graphite, hashable
 
     -- Directories containing source files.
     hs-source-dirs:   src
@@ -123,4 +123,5 @@ test-suite day16-test
         base ^>=4.16.3.0,
         containers,
         day16,
+        graphite,
         HUnit
