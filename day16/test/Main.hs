@@ -39,22 +39,6 @@ testDequeue =
    in TestCase (assertEqual "items should be dequeued in order" [1, 2, 3, 4, 5] (dequeueAll (insertAll [3, 2, 4, 5, 1] empty)))
 
 --
--- State
---
-
-testEmptyState :: Test
-testEmptyState =
-  let expected = D.stateFromLists [(0, "start")] [("start", 0)]
-      actual = D.initialState "start"
-   in TestCase (assertEqual "empty state" expected actual)
-
-testUpdateDistance :: Test
-testUpdateDistance =
-  let expected = D.stateFromLists [(0, "s"), (7, "a"), (9, "b")] [("a", 7), ("b", 9), ("s", 0)]
-      actual = D.updateDistance "a" 7 . D.updateDistance "b" 9 . D.updateDistance "a" 10 $ D.initialState "s"
-   in TestCase (assertEqual "update state" expected actual)
-
---
 -- dijkstra
 --
 
@@ -86,8 +70,6 @@ tests =
       TestLabel "emptySet" testEmpty,
       TestLabel "insert" testInsert,
       testDequeue,
-      -- State
-      TestLabel "testEmptyState" testEmptyState,
-      TestLabel "testUpdateDistance" testUpdateDistance,
+      -- Dijkstra
       TestLabel "testDistances" testDistances
     ]

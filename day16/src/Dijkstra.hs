@@ -1,14 +1,11 @@
 -- | Dijkstra's algorithm for computing distance matrix for a graph.
---
--- TODO: put everything but `distances` in an "Internal" module.
-module Dijkstra (distances, State, initialState, stateFromLists, updateDistance) where
+module Dijkstra (distances) where
 
 import qualified Data.Graph.DGraph as DG
 import qualified Data.Graph.Types as GT
 import Data.Hashable (Hashable)
-import qualified Data.Map.Strict as M (Map, empty, fromList, insert, lookup, toList)
-import Debug.Trace
-import qualified PriorityQueue as PQ (PriorityQueue, delete, empty, fromList, insert, peek)
+import qualified Data.Map.Strict as M (Map, fromList, insert, lookup, toList)
+import qualified PriorityQueue as PQ (PriorityQueue, delete, fromList, insert, peek)
 
 -- | Given a list of nodes and a function that returns a node's (neighbors, cost) pairs,
 --   returns a function that returns the cost to go from one node to another.
@@ -36,19 +33,16 @@ buildArcsFromNode g start =
 --   Both data structures must always be updated together.
 dijkstra :: (Ord a, Show a, Hashable a) => DG.DGraph a Int -> State a -> [(a, Int)]
 dijkstra g state0 =
-  case traceIt "PPP" (peekNextUnvisited (traceIt "SSS" state0)) of
+  case peekNextUnvisited state0 of
     Nothing -> M.toList (nodeToDistance state0)
     Just (d, n) ->
       let state1 = deleteUnvisited (d, n) state0
-          neighbors = map arcDestAndCost (DG.outboundingArcs g n)
-          state2 = foldl (updateNeighbor d) state1 neighbors
+          neighborsAndCosts = map arcDestAndCost (DG.outboundingArcs g n)
+          state2 = foldl (updateNeighbor d) state1 neighborsAndCosts
        in dijkstra g state2
 
 arcDestAndCost :: GT.Arc v e -> (v, e)
 arcDestAndCost (GT.Arc _ v e) = (v, e)
-
-traceIt :: Show a => String -> a -> a
-traceIt label x = trace (label ++ " " ++ show x) x
 
 updateNeighbor :: Ord a => Int -> State a -> (a, Int) -> State a
 updateNeighbor d0 state (n, d) =
@@ -66,24 +60,19 @@ data State a = State
   }
   deriving (Eq, Show)
 
-stateFromLists :: Ord a => [(Int, a)] -> [(a, Int)] -> State a
-stateFromLists u ntd =
-  State
-    { unvisited = PQ.fromList u,
-      nodeToDistance = M.fromList ntd
-    }
-
 -- | Initial state, with the starting node at distance 0 on the unvisited list
 initialState :: Ord a => a -> State a
 initialState start =
   State
-    { unvisited = PQ.insert (0, start) PQ.empty,
-      nodeToDistance = M.insert start 0 M.empty
+    { unvisited = PQ.fromList [(0, start)],
+      nodeToDistance = M.fromList [(start, 0)]
     }
 
+-- | Returns the (distance, node) for the next unvisited node with the lowest distance.
 peekNextUnvisited :: Ord a => State a -> Maybe (Int, a)
 peekNextUnvisited s = PQ.peek (unvisited s)
 
+-- | Deletes one of the unvisited nodes.
 deleteUnvisited :: Ord a => (Int, a) -> State a -> State a
 deleteUnvisited item s = s {unvisited = PQ.delete item (unvisited s)}
 
