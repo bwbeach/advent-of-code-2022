@@ -20,7 +20,8 @@ where the valve is, plus one second to open the valve.
 Also, there's no reason to ever open a valve with a flow rate of 0,
 so those aren't even considered.
 
-Time for part 1 with A* search, and no useful heuristic: 8.5s
+Time for part 1 with A* search, and no useful heuristic: 12s
+Time for part 1 with A* search, and a heuristic: 3.5s
 -}
 
 module Main (main) where
@@ -93,9 +94,17 @@ initialState valves graph =
 --
 -- May under-estimate the cost, but must never over-estimate the cost.
 --
+-- At best, we can open one valve every other second, starting with the
+-- highest flow valve.
+--
 -- TODO: make a better estimate
 stateEstimate :: State -> Int
-stateEstimate = stateCost
+stateEstimate s =
+  let valveRates = reverse . sort . M.elems $ stateToOpen s
+      t = stateRemainingTime s
+      maxCost = sum valveRates * t
+      bestCaseFlow = sum . zipWith (*) [t - 2, t - 4 .. 0] $ valveRates
+   in maxCost - bestCaseFlow
 
 -- Advance to the end of time, not doing anything else.
 advanceByDoingNothing :: State -> Maybe State
@@ -147,7 +156,7 @@ day16 text =
    in maxCost - cost
 
 solve :: DGraph String Int -> State -> Maybe (Int, [State])
-solve g = aStar (nextStates g) transitionCost (const 0) isTerminal
+solve g = aStar (nextStates g) transitionCost stateEstimate isTerminal
 
 transitionCost :: State -> State -> Int
 transitionCost s0 s1 =
