@@ -57,26 +57,15 @@ data State = State
     stateRemainingTime :: Int,
     -- where in the cave are we?
     statePos :: String,
-    -- the list of valves opened, in reverse order
-    stateMoves :: [String],
-    {- the rest of the fields could be derived from those above, so are not needed in Eq or Ord -}
-
     -- The flow that has not happened
     stateCost :: Int,
     -- the remaining valves to open
     stateToOpen :: M.Map String Int
   }
-
-instance Eq State where
-  a == b = stateRemainingTime a == stateRemainingTime b && statePos a == statePos b && stateMoves a == stateMoves b
-
-instance Ord State where
-  compare a b =
-    let tupleA = (stateRemainingTime a, statePos a, stateMoves a)
-     in compare tupleA (stateRemainingTime b, statePos b, stateMoves b)
+  deriving (Eq, Ord)
 
 instance Show State where
-  show s = "State " ++ show (stateRemainingTime s) ++ " " ++ statePos s ++ " " ++ show (reverse (stateMoves s)) ++ " - " ++ show (stateCost s) ++ " " ++ show (stateToOpen s)
+  show s = "State " ++ show (stateRemainingTime s) ++ " " ++ statePos s ++ " - " ++ show (stateCost s) ++ " " ++ show (stateToOpen s)
 
 -- The initial state
 initialState :: M.Map String Int -> DGraph String Int -> State
@@ -86,7 +75,6 @@ initialState valves graph =
       statePos = "AA",
       -- The cost so far: how much it cost to get TO this state
       stateCost = 0,
-      stateMoves = [],
       stateToOpen = valves
     }
 
@@ -134,7 +122,6 @@ advanceStateByMoving g s0 dest =
               { stateRemainingTime = newTime,
                 statePos = dest,
                 stateCost = stateCost s0 + unopenedFlow * deltaT,
-                stateMoves = dest : stateMoves s0,
                 stateToOpen = M.delete dest (stateToOpen s0)
               }
         else Nothing
