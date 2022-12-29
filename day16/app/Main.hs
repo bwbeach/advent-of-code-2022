@@ -2,15 +2,15 @@
 Advent of Code 2022, Day 16
 
 My strategy is to represent the state of the search explicitly,
-and do a most-likely-to-succeed-first search, based on a scoring
-function that gives an upper bound on the score resulting from
-a state.  The state with the highest upper bound is proccessed
-fist, resulting in a set of new states, usually with lower
-upper bounds.
+and do a best-first search, using the A* search from the
+algorithms library.
 
-When a state has no more moves available, it is "terminal", and the
-upper bound on the score is also the exact score.  When the state
-with the highest upper bound is terminal, that's the answer.
+When a state is at the end of the time period, it is "terminal",
+and the searching can stop.  The goal is to find the termal state
+with the lowest cost.
+
+Cost is counted as the inverse of the score the problem wants:
+it's a measure of the flow NOT happening.
 
 There's no point in moving around in the cave, except to go to a valve
 and open it.  So the only action ever considered is
@@ -60,12 +60,7 @@ data State = State
     stateMoves :: [String],
     {- the rest of the fields could be derived from those above, so are not needed in Eq or Ord -}
 
-    -- the maximum flow rate, if all of the valves are open
-    stateMaxFlow :: Int,
-    -- the total score from all of the valves that have been
-    -- opened so far, up to the current time.
-    stateScore :: Int,
-    -- the inverse of the score
+    -- The flow that has not happened
     stateCost :: Int,
     -- the remaining valves to open
     stateToOpen :: M.Map String Int,
@@ -82,7 +77,7 @@ instance Ord State where
      in compare tupleA (stateTime b, statePos b, stateMoves b)
 
 instance Show State where
-  show s = "State " ++ show (stateTime s) ++ " " ++ statePos s ++ " " ++ show (reverse (stateMoves s)) ++ " - " ++ show (stateScore s) ++ " " ++ show (stateToOpen s)
+  show s = "State " ++ show (stateTime s) ++ " " ++ statePos s ++ " " ++ show (reverse (stateMoves s)) ++ " - " ++ show (stateCost s) ++ " " ++ show (stateToOpen s)
 
 -- The initial state
 initialState :: M.Map String Int -> DGraph String Int -> State
@@ -91,9 +86,7 @@ initialState valves graph =
     { stateTime = 0,
       statePos = "AA",
       -- The cost so far: how much it cost to get TO this state
-      stateMaxFlow = sum . M.elems $ valves,
       stateCost = 0,
-      stateScore = 0,
       stateMoves = [],
       stateToOpen = valves,
       stateGraph = graph
@@ -129,14 +122,12 @@ advanceStateByMoving s0 dest =
       newTime = stateTime s0 + distance + 1
       deltaT = newTime - stateTime s0
       unopenedFlow = sum . M.elems $ stateToOpen s0
-      openedFlow = stateMaxFlow s0
    in if newTime <= 30
         then
           Just
             s0
               { stateTime = newTime,
                 statePos = dest,
-                stateScore = stateScore s0 + openedFlow * deltaT,
                 stateCost = stateCost s0 + unopenedFlow * deltaT,
                 stateMoves = dest : stateMoves s0,
                 stateToOpen = M.delete dest (stateToOpen s0)
