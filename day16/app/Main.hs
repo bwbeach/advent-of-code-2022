@@ -53,7 +53,7 @@ runInput fileName = do
 -- and opened some valves.
 data State = State
   { -- the current time, in seconds since start
-    stateTime :: Int,
+    stateRemainingTime :: Int,
     -- where in the cave are we?
     statePos :: String,
     -- the list of valves opened, in reverse order
@@ -69,21 +69,21 @@ data State = State
   }
 
 instance Eq State where
-  a == b = stateTime a == stateTime b && statePos a == statePos b && stateMoves a == stateMoves b
+  a == b = stateRemainingTime a == stateRemainingTime b && statePos a == statePos b && stateMoves a == stateMoves b
 
 instance Ord State where
   compare a b =
-    let tupleA = (stateTime a, statePos a, stateMoves a)
-     in compare tupleA (stateTime b, statePos b, stateMoves b)
+    let tupleA = (stateRemainingTime a, statePos a, stateMoves a)
+     in compare tupleA (stateRemainingTime b, statePos b, stateMoves b)
 
 instance Show State where
-  show s = "State " ++ show (stateTime s) ++ " " ++ statePos s ++ " " ++ show (reverse (stateMoves s)) ++ " - " ++ show (stateCost s) ++ " " ++ show (stateToOpen s)
+  show s = "State " ++ show (stateRemainingTime s) ++ " " ++ statePos s ++ " " ++ show (reverse (stateMoves s)) ++ " - " ++ show (stateCost s) ++ " " ++ show (stateToOpen s)
 
 -- The initial state
 initialState :: M.Map String Int -> DGraph String Int -> State
 initialState valves graph =
   State
-    { stateTime = 0,
+    { stateRemainingTime = 30,
       statePos = "AA",
       -- The cost so far: how much it cost to get TO this state
       stateCost = 0,
@@ -103,13 +103,13 @@ stateEstimate = stateCost
 -- Advance to the end of time, not doing anything else.
 advanceByDoingNothing :: State -> Maybe State
 advanceByDoingNothing s =
-  if stateTime s < 30
+  if 0 < stateRemainingTime s
     then
-      let deltaT = 30 - stateTime s
+      let deltaT = stateRemainingTime s
           unopenedFlow = sum . M.elems $ stateToOpen s
        in Just
             s
-              { stateTime = 30,
+              { stateRemainingTime = 0,
                 stateCost = stateCost s + deltaT * unopenedFlow
               }
     else Nothing
@@ -119,14 +119,14 @@ advanceStateByMoving :: State -> String -> Maybe State
 advanceStateByMoving s0 dest =
   let g = stateGraph s0
       distance = fromJust (graphLookup g (statePos s0) dest)
-      newTime = stateTime s0 + distance + 1
-      deltaT = newTime - stateTime s0
+      deltaT = distance + 1
+      newTime = stateRemainingTime s0 - deltaT
       unopenedFlow = sum . M.elems $ stateToOpen s0
-   in if newTime <= 30
+   in if 0 <= newTime
         then
           Just
             s0
-              { stateTime = newTime,
+              { stateRemainingTime = newTime,
                 statePos = dest,
                 stateCost = stateCost s0 + unopenedFlow * deltaT,
                 stateMoves = dest : stateMoves s0,
@@ -155,7 +155,7 @@ solve = aStar nextStates transitionCost (const 0) isTerminal
 
 transitionCost :: State -> State -> Int
 transitionCost s0 s1 =
-  let deltaT = stateTime s1 - stateTime s0
+  let deltaT = stateRemainingTime s0 - stateRemainingTime s1
       unopened = sum . M.elems $ stateToOpen s0
    in deltaT * unopened
 
@@ -165,7 +165,7 @@ nextStates s0 =
     ++ mapMaybe (advanceStateByMoving s0) (M.keys (stateToOpen s0))
 
 isTerminal :: State -> Bool
-isTerminal s = stateTime s == 30
+isTerminal s = stateRemainingTime s == 0
 
 traceIt :: Show a => [Char] -> a -> a
 traceIt lbl a = trace (lbl ++ " " ++ show a) a
