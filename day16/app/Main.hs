@@ -33,7 +33,8 @@ import Data.Graph.Types (Arc (..), Graph (vertices))
 import Data.Hashable (Hashable)
 import Data.List (sort)
 import qualified Data.Map.Strict as M (Map, delete, elems, fromList, keys)
-import Data.Maybe (fromJust, mapMaybe)
+import Data.Maybe (catMaybes, fromJust, mapMaybe)
+import qualified Data.Set as S (Set, delete, fromList, insert, toList)
 import Debug.Trace
 import Dijkstra (distances)
 
@@ -50,14 +51,20 @@ runInput fileName = do
   putStrLn fileName
   print . day16 $ input
 
+-- An actor (me or the elephant) who is going around opening valves
+--
+-- holds the time that this actor will be able to do something, and
+-- where they will be at the time.
+type Actor = (Int, String)
+
 -- A place in the search space, after having made some moves
 -- and opened some valves.
 data State = State
   { -- the current time, in seconds since start
     stateRemainingTime :: Int,
-    -- where in the cave are we?
-    statePos :: String,
-    -- The flow that has not happened
+    -- what actors are around to do things?
+    stateActors :: S.Set Actor,
+    -- The flow that has NOT happened up until now
     stateCost :: Int,
     -- the remaining valves to open
     stateToOpen :: M.Map String Int
@@ -65,15 +72,14 @@ data State = State
   deriving (Eq, Ord)
 
 instance Show State where
-  show s = "State " ++ show (stateRemainingTime s) ++ " " ++ statePos s ++ " - " ++ show (stateCost s) ++ " " ++ show (stateToOpen s)
+  show s = "State " ++ show (stateRemainingTime s) ++ " " ++ show (stateActors s) ++ " - " ++ show (stateCost s) ++ " " ++ show (stateToOpen s)
 
 -- The initial state
 initialState :: M.Map String Int -> State
 initialState valves =
   State
     { stateRemainingTime = 30,
-      statePos = "AA",
-      -- The cost so far: how much it cost to get TO this state
+      stateActors = S.fromList [(30, "AA")],
       stateCost = 0,
       stateToOpen = valves
     }
@@ -85,7 +91,7 @@ initialState valves =
 -- At best, we can open one valve every other second, starting with the
 -- highest flow valve.
 --
--- TODO: make a better estimate
+-- TODO: use number of actors
 stateEstimate :: State -> Int
 stateEstimate s =
   let valveRates = reverse . sort . M.elems $ stateToOpen s
@@ -109,9 +115,10 @@ advanceByDoingNothing s =
     else Nothing
 
 -- Advance a state by moving to a room with a valve and opening it.
-advanceStateByMoving :: DGraph String Int -> State -> String -> Maybe State
-advanceStateByMoving g s0 dest =
-  let distance = fromJust (graphLookup g (statePos s0) dest)
+advanceStateByMoving :: DGraph String Int -> State -> Actor -> String -> Maybe State
+advanceStateByMoving g s0 actor dest =
+  let (_, src) = actor
+      distance = fromJust (graphLookup g src dest)
       deltaT = distance + 1
       newTime = stateRemainingTime s0 - deltaT
       unopenedFlow = sum . M.elems $ stateToOpen s0
@@ -120,7 +127,7 @@ advanceStateByMoving g s0 dest =
           Just
             s0
               { stateRemainingTime = newTime,
-                statePos = dest,
+                stateActors = S.insert (newTime, dest) . S.delete actor $ stateActors s0,
                 stateCost = stateCost s0 + unopenedFlow * deltaT,
                 stateToOpen = M.delete dest (stateToOpen s0)
               }
@@ -145,6 +152,8 @@ day16 text =
 solve :: DGraph String Int -> State -> Maybe (Int, [State])
 solve g = aStar (nextStates g) transitionCost stateEstimate isTerminal
 
+-- | Cost of moving from one state to another
+-- is the cost of all of the valves that aren't opened yet.
 transitionCost :: State -> State -> Int
 transitionCost s0 s1 =
   let deltaT = stateRemainingTime s0 - stateRemainingTime s1
@@ -153,8 +162,14 @@ transitionCost s0 s1 =
 
 nextStates :: DGraph String Int -> State -> [State]
 nextStates g s0 =
-  mapMaybe advanceByDoingNothing [s0]
-    ++ mapMaybe (advanceStateByMoving g s0) (M.keys (stateToOpen s0))
+  catMaybes
+    ( advanceByDoingNothing s0
+        : [ advanceStateByMoving g s0 actor dest
+            | actor@(actorTime, _) <- S.toList $ stateActors s0,
+              actorTime == stateRemainingTime s0,
+              dest <- M.keys (stateToOpen s0)
+          ]
+    )
 
 isTerminal :: State -> Bool
 isTerminal s = stateRemainingTime s == 0
