@@ -19,24 +19,27 @@ where the valve is, plus one second to open the valve.
 
 Also, there's no reason to ever open a valve with a flow rate of 0,
 so those aren't even considered.
+
+Time for part 1 with A* search, and no useful heuristic: 8.5s
 -}
 
-module Main where
+module Main (main) where
 
+import Algorithm.Search (aStar)
 import Data.Graph.DGraph (DGraph, fromArcsList)
 import qualified Data.Graph.DGraph as DG
 import Data.Graph.Types (Arc (..), Graph (vertices))
 import Data.Hashable (Hashable)
 import Data.List (sort)
-import qualified Data.Map.Strict as M (Map, delete, elems, fromList, toDescList, toList)
+import qualified Data.Map.Strict as M (Map, delete, elems, fromList, keys)
 import Data.Maybe (fromJust, mapMaybe)
-import Data.Tuple (swap)
 import Debug.Trace
 import Dijkstra (distances)
-import qualified PriorityQueue as PQ
 
 main :: IO ()
 main = do
+  runInput "test0.txt"
+  runInput "test1.txt"
   runInput "test.txt"
   runInput "input.txt"
 
@@ -57,10 +60,13 @@ data State = State
     stateMoves :: [String],
     {- the rest of the fields could be derived from those above, so are not needed in Eq or Ord -}
 
+    -- the maximum flow rate, if all of the valves are open
+    stateMaxFlow :: Int,
     -- the total score from all of the valves that have been
-    -- opened so far, including all flows from those valves
-    -- up to time 30.
+    -- opened so far, up to the current time.
     stateScore :: Int,
+    -- the inverse of the score
+    stateCost :: Int,
     -- the remaining valves to open
     stateToOpen :: M.Map String Int,
     -- the graph we're working on
@@ -84,56 +90,58 @@ initialState valves graph =
   State
     { stateTime = 0,
       statePos = "AA",
+      -- The cost so far: how much it cost to get TO this state
+      stateMaxFlow = sum . M.elems $ valves,
+      stateCost = 0,
       stateScore = 0,
       stateMoves = [],
       stateToOpen = valves,
       stateGraph = graph
     }
 
+-- | An estimate of the cost of a solution from the given state.
+--
+-- May under-estimate the cost, but must never over-estimate the cost.
+--
+-- TODO: make a better estimate
+stateEstimate :: State -> Int
+stateEstimate = stateCost
+
+-- Advance to the end of time, not doing anything else.
+advanceByDoingNothing :: State -> Maybe State
+advanceByDoingNothing s =
+  if stateTime s < 30
+    then
+      let deltaT = 30 - stateTime s
+          unopenedFlow = sum . M.elems $ stateToOpen s
+       in Just
+            s
+              { stateTime = 30,
+                stateCost = stateCost s + deltaT * unopenedFlow
+              }
+    else Nothing
+
 -- Advance a state by moving to a room with a valve and opening it.
-advanceState :: State -> (String, Int) -> State
-advanceState s0 (dest, flow) =
+advanceStateByMoving :: State -> String -> Maybe State
+advanceStateByMoving s0 dest =
   let g = stateGraph s0
       distance = fromJust (graphLookup g (statePos s0) dest)
       newTime = stateTime s0 + distance + 1
-   in s0
-        { stateTime = newTime,
-          statePos = dest,
-          stateScore = stateScore s0 + (30 - newTime) * flow,
-          stateMoves = dest : stateMoves s0,
-          stateToOpen = M.delete dest (stateToOpen s0)
-        }
-
--- An entry in the queue of states to look at.
--- Ordering is highest upper bound first.
-data QueueEntry = QueueEntry
-  { qeUpperBound :: Int,
-    qeState :: State
-  }
-  deriving (Eq, Show)
-
-instance Ord QueueEntry where
-  compare QueueEntry {qeUpperBound = ub1, qeState = s1} QueueEntry {qeUpperBound = ub2, qeState = s2} =
-    compare (ub2, s2) (ub1, s1)
-
-makeQueueEntry :: State -> QueueEntry
-makeQueueEntry s = QueueEntry {qeUpperBound = upperBound s, qeState = s}
-
-upperBound :: State -> Int
-upperBound s =
-  if isTerminal s
-    then stateScore s
-    else -- TODO: store valves in a more convenient way
-
-      let valvesInOrder = map fst . reverse . sort . map swap . M.toDescList $ stateToOpen s
-       in upperBoundHelper (stateScore s) (stateTime s) valvesInOrder
-
-upperBoundHelper :: Int -> Int -> [Int] -> Int
-upperBoundHelper s t vs
-  | 30 <= t = s
-  | otherwise = case vs of
-      [] -> s
-      (v : vs') -> upperBoundHelper (s + (30 - t) * v) (t + 2) vs'
+      deltaT = newTime - stateTime s0
+      unopenedFlow = sum . M.elems $ stateToOpen s0
+      openedFlow = stateMaxFlow s0
+   in if newTime <= 30
+        then
+          Just
+            s0
+              { stateTime = newTime,
+                statePos = dest,
+                stateScore = stateScore s0 + openedFlow * deltaT,
+                stateCost = stateCost s0 + unopenedFlow * deltaT,
+                stateMoves = dest : stateMoves s0,
+                stateToOpen = M.delete dest (stateToOpen s0)
+              }
+        else Nothing
 
 day16 :: String -> Int
 day16 text =
@@ -145,36 +153,28 @@ day16 text =
       g1 = distances g0
       -- make the initial state
       s0 = initialState valves g1
-      -- make the initial queue
-      q0 = PQ.fromList [makeQueueEntry s0]
-   in solve q0
+      -- find the least-cost path
+      (cost, _) = fromJust . solve $ s0
+      -- what's the cost of doing nothing, and opening no valves?
+      maxCost = 30 * (sum . M.elems $ valves)
+   in maxCost - cost
 
-solve :: PQ.PriorityQueue QueueEntry -> Int
-solve q0 =
-  let entry = fromJust (PQ.peek q0)
-      s = qeState entry
-      q1 = PQ.delete entry q0
-   in if isTerminal s
-        then stateScore s
-        else solve (addNextSteps s q1)
+solve :: State -> Maybe (Int, [State])
+solve = aStar nextStates transitionCost (const 0) isTerminal
 
-addNextSteps :: State -> PQ.PriorityQueue QueueEntry -> PQ.PriorityQueue QueueEntry
-addNextSteps s pq = foldl addNextStep pq (nextQueueEntries s)
-
-addNextStep :: PQ.PriorityQueue QueueEntry -> QueueEntry -> PQ.PriorityQueue QueueEntry
-addNextStep pq qe = PQ.insert qe pq
-
-nextQueueEntries :: State -> [QueueEntry]
-nextQueueEntries s = map makeQueueEntry (nextStates s)
+transitionCost :: State -> State -> Int
+transitionCost s0 s1 =
+  let deltaT = stateTime s1 - stateTime s0
+      unopened = sum . M.elems $ stateToOpen s0
+   in deltaT * unopened
 
 nextStates :: State -> [State]
-nextStates s0 = map (advanceState s0) (M.toList (stateToOpen s0))
+nextStates s0 =
+  mapMaybe advanceByDoingNothing [s0]
+    ++ mapMaybe (advanceStateByMoving s0) (M.keys (stateToOpen s0))
 
 isTerminal :: State -> Bool
-isTerminal s =
-  let t = stateTime s
-      toOpen = stateToOpen s
-   in 30 <= stateTime s || null toOpen || 29 - t <= minimum (M.elems toOpen)
+isTerminal s = stateTime s == 30
 
 traceIt :: Show a => [Char] -> a -> a
 traceIt lbl a = trace (lbl ++ " " ++ show a) a

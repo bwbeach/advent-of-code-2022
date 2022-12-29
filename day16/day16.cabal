@@ -91,7 +91,8 @@ executable day16
         containers,
         day16,
         graphite,
-        hashable
+        hashable,
+        search-algorithms
 
     -- Directories containing source files.
     hs-source-dirs:   app

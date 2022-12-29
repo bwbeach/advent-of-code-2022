@@ -1,0 +1,2 @@
+Valve AA has flow rate=0; tunnels lead to valves DD
+Valve DD has flow rate=20; tunnel leads to valve AA
