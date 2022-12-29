@@ -63,9 +63,7 @@ data State = State
     -- The flow that has not happened
     stateCost :: Int,
     -- the remaining valves to open
-    stateToOpen :: M.Map String Int,
-    -- the graph we're working on
-    stateGraph :: DGraph String Int
+    stateToOpen :: M.Map String Int
   }
 
 instance Eq State where
@@ -88,8 +86,7 @@ initialState valves graph =
       -- The cost so far: how much it cost to get TO this state
       stateCost = 0,
       stateMoves = [],
-      stateToOpen = valves,
-      stateGraph = graph
+      stateToOpen = valves
     }
 
 -- | An estimate of the cost of a solution from the given state.
@@ -115,10 +112,9 @@ advanceByDoingNothing s =
     else Nothing
 
 -- Advance a state by moving to a room with a valve and opening it.
-advanceStateByMoving :: State -> String -> Maybe State
-advanceStateByMoving s0 dest =
-  let g = stateGraph s0
-      distance = fromJust (graphLookup g (statePos s0) dest)
+advanceStateByMoving :: DGraph String Int -> State -> String -> Maybe State
+advanceStateByMoving g s0 dest =
+  let distance = fromJust (graphLookup g (statePos s0) dest)
       deltaT = distance + 1
       newTime = stateRemainingTime s0 - deltaT
       unopenedFlow = sum . M.elems $ stateToOpen s0
@@ -145,13 +141,13 @@ day16 text =
       -- make the initial state
       s0 = initialState valves g1
       -- find the least-cost path
-      (cost, _) = fromJust . solve $ s0
+      (cost, _) = fromJust . solve g1 $ s0
       -- what's the cost of doing nothing, and opening no valves?
       maxCost = 30 * (sum . M.elems $ valves)
    in maxCost - cost
 
-solve :: State -> Maybe (Int, [State])
-solve = aStar nextStates transitionCost (const 0) isTerminal
+solve :: DGraph String Int -> State -> Maybe (Int, [State])
+solve g = aStar (nextStates g) transitionCost (const 0) isTerminal
 
 transitionCost :: State -> State -> Int
 transitionCost s0 s1 =
@@ -159,10 +155,10 @@ transitionCost s0 s1 =
       unopened = sum . M.elems $ stateToOpen s0
    in deltaT * unopened
 
-nextStates :: State -> [State]
-nextStates s0 =
+nextStates :: DGraph String Int -> State -> [State]
+nextStates g s0 =
   mapMaybe advanceByDoingNothing [s0]
-    ++ mapMaybe (advanceStateByMoving s0) (M.keys (stateToOpen s0))
+    ++ mapMaybe (advanceStateByMoving g s0) (M.keys (stateToOpen s0))
 
 isTerminal :: State -> Bool
 isTerminal s = stateRemainingTime s == 0
