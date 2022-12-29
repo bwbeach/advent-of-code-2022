@@ -68,8 +68,8 @@ instance Show State where
   show s = "State " ++ show (stateRemainingTime s) ++ " " ++ statePos s ++ " - " ++ show (stateCost s) ++ " " ++ show (stateToOpen s)
 
 -- The initial state
-initialState :: M.Map String Int -> DGraph String Int -> State
-initialState valves graph =
+initialState :: M.Map String Int -> State
+initialState valves =
   State
     { stateRemainingTime = 30,
       statePos = "AA",
@@ -135,7 +135,7 @@ day16 text =
       -- compute the distances between all pairs of nodes
       g1 = distances g0
       -- make the initial state
-      s0 = initialState valves g1
+      s0 = initialState valves
       -- find the least-cost path
       (cost, _) = fromJust . solve g1 $ s0
       -- what's the cost of doing nothing, and opening no valves?
