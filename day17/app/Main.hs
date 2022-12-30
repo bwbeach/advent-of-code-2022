@@ -1,8 +1,14 @@
 module Main where
 
-import qualified MyLib (someFunc)
+import MyLib (parseRocks, showRock)
 
 main :: IO ()
 main = do
-  putStrLn "Hello, Haskell!"
-  MyLib.someFunc
+  runInput "test.txt"
+
+runInput :: String -> IO ()
+runInput fileName = do
+  rockText <- readFile "rocks.txt"
+  let rocks = parseRocks rockText
+  print rocks
+  putStr . concatMap (("\n" ++) . showRock) $ rocks
