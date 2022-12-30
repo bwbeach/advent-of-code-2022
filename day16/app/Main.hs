@@ -29,13 +29,12 @@ module Main (main) where
 import Algorithm.Search (aStar)
 import Data.Graph.DGraph (DGraph, fromArcsList)
 import qualified Data.Graph.DGraph as DG
-import Data.Graph.Types (Arc (..), Graph (vertices))
+import Data.Graph.Types (Arc (..))
 import Data.Hashable (Hashable)
 import Data.List (sort)
 import qualified Data.Map.Strict as M (Map, delete, elems, fromList, keys, (!))
 import Data.Maybe (catMaybes, fromJust, mapMaybe)
-import qualified Data.Set as S (Set, delete, empty, fromList, insert, toList)
-import Debug.Trace
+import qualified Data.Set as S (Set, delete, fromList, insert, toList)
 import Dijkstra (distances)
 
 main :: IO ()
@@ -59,16 +58,36 @@ runDay16 duration actors input = do
   print totalFlow
   putStr . unlines . map show $ path
 
--- An actor (me or the elephant) who is going around opening valves
+day16 :: Int -> [Actor] -> String -> (Int, [State])
+day16 remainingTime actors input =
+  let -- read the non-zero valves and their rates
+      valves = parseValves input
+      -- read the graph as presented
+      g0 = parseGraph input
+      -- make a complete graph, with distances between all pairs of nodes
+      g1 = distances g0
+      -- make the initial state
+      s0 = initialState remainingTime actors valves
+      -- find the least-cost path
+      (cost, path) = fromJust . solve g1 $ s0
+      -- what's the cost of doing nothing, and opening no valves?
+      maxCost = remainingTime * (sum . M.elems $ valves)
+   in (maxCost - cost, path)
+
+-- | An actor (me or the elephant) who is going around opening valves
 --
+-- An actor always has a destination, with an arrival time.  When they
+-- arrive, they will open a valve, and then either stop (and be removed
+-- from the actor list), or go on to another valve.
 data Actor = Actor
   { -- the name of the actor
     actorName :: String,
-    -- the time at which the actor will be available
+    -- the time at which the actor will finish opening a valve, and be available to go elsewhere
     actorAvailableTime :: Int,
-    -- the location where an actor will be available
+    -- the location where the actor will be available
     actorLocation :: String,
-    -- the flow for the valve that finishes opening when the actor becomes available
+    -- the flow for the valve that finishes opening when the actor becomes available, which is
+    -- subtracted from the current cost-per-second at that time
     actorFlowIncrease :: Int
   }
   deriving (Eq, Ord)
@@ -83,20 +102,29 @@ makeActor name avail loc =
     }
 
 instance Show Actor where
-  show a = actorName a ++ ":" ++ show (actorAvailableTime a) ++ ":" ++ actorLocation a ++ ":" ++ show (actorFlowIncrease a)
+  show a =
+    actorName a
+      ++ ":"
+      ++ show (actorAvailableTime a)
+      ++ ":"
+      ++ actorLocation a
+      ++ ":"
+      ++ show (actorFlowIncrease a)
 
--- A place in the search space, after having made some moves
--- and opened some valves.
+-- A node in the search tree, after having made some moves and opened some valves.
 data State = State
-  { -- the current time, in seconds since start
+  { -- the current time, in seconds until done
     stateRemainingTime :: Int,
-    -- what actors are around to do things?
+    -- what actors are around to do things?  each actor has a time when they
+    -- become available for another move.
     stateActors :: S.Set Actor,
-    -- The flow that has NOT happened up until now
+    -- The flow that has NOT happened up until now, which is how we measure the
+    -- cost of a solution.
     stateCost :: Int,
     -- The sum of the costs of the valves that are not open
     stateCostPerSecond :: Int,
-    -- the remaining valves to open.  valves are removed as soon as opening is planned.
+    -- the remaining valves to open.  valves are removed as soon as opening is planned,
+    -- at which point the actor records the delta to stateCostPerSecond to be applied later.
     stateToOpen :: M.Map String Int
   }
   deriving (Eq, Ord)
@@ -114,7 +142,7 @@ instance Show State where
       ++ " "
       ++ show (stateCostPerSecond s)
 
--- The initial state
+-- | The initial state, with a duration and a set of actors.
 initialState :: Int -> [Actor] -> M.Map String Int -> State
 initialState remainingTime actors valves =
   State
@@ -124,6 +152,33 @@ initialState remainingTime actors valves =
       stateCostPerSecond = sum . M.elems $ valves,
       stateToOpen = valves
     }
+
+-- | Solves Day 16 using A* search
+solve :: DGraph String Int -> State -> Maybe (Int, [State])
+solve g = aStar (nextStates g) transitionCost stateEstimate isTerminal
+
+-- | Cost of moving from one state to another
+transitionCost :: State -> State -> Int
+transitionCost s0 s1 = stateCost s1 - stateCost s0
+
+-- | Compute all of the next nodes in the search tree starting at a given node.
+nextStates :: DGraph String Int -> State -> [State]
+nextStates g s0 =
+  catMaybes (jumpToEnd ++ changedClock ++ removedActors ++ movedActors)
+  where
+    jumpToEnd = [nextWithNoActors s0]
+    changedClock = [nextByChangingClock s0]
+    removedActors =
+      [ nextByRemovingActor s0 actor
+        | actor <- S.toList $ stateActors s0,
+          actorAvailableTime actor == stateRemainingTime s0
+      ]
+    movedActors =
+      [ nextByMovingActor g s0 actor dest
+        | actor <- S.toList $ stateActors s0,
+          actorAvailableTime actor == stateRemainingTime s0,
+          dest <- M.keys (stateToOpen s0)
+      ]
 
 -- | An estimate of the cost of a solution from the given state.
 --
@@ -155,7 +210,12 @@ nextWithNoActors s =
           }
     else Nothing
 
--- | Advance to the end of time, not doing anything else.
+-- | Remove one of the actors.
+--
+-- There are cases where actor A picking the last valve is not as
+-- good as actor B picking the same valve later, because B is closer.
+-- So sometimes the best thing an actor can do is step aside and
+-- let other actors finish the job.
 nextByRemovingActor :: State -> Actor -> Maybe State
 nextByRemovingActor s0 actor =
   let s1 = openValve actor s0
@@ -168,28 +228,40 @@ openValve actor s =
     { stateCostPerSecond = stateCostPerSecond s - actorFlowIncrease actor
     }
 
--- | Advance a state by planning a move for an actor
-advanceStateByMoving :: DGraph String Int -> State -> Actor -> String -> Maybe State
-advanceStateByMoving g s0 actor dest =
-  let s1 = openValve actor s0
+-- | Advance a state by planning a move for an actor.
+--
+-- This action is applied when an actor becomes available and there is
+-- a valve that nobody else has opened or has planned to open.
+nextByMovingActor :: DGraph String Int -> State -> Actor -> String -> Maybe State
+nextByMovingActor g s0 actor dest =
+  let -- the actor is done opening the previous valve
+      s1 = openValve actor s0
+      -- where the actor is moving from
       src = actorLocation actor
-      distance = fromJust (graphLookup g src dest) -- how far the actor is moving
-      actorDuration = distance + 1 -- how long it will take to move and open the valve
+      -- how far the actor is moving
+      distance = fromJust (graphLookup g src dest)
+      -- how long it will take to move and then open the valve
+      actorDuration = distance + 1
+      -- when the valve will be open
       actorDoneTime = stateRemainingTime s1 - actorDuration
+      -- the updated actor, with the intention to open the valve recorded
       actor1 = actor {actorAvailableTime = actorDoneTime, actorLocation = dest, actorFlowIncrease = stateToOpen s0 M.! dest}
+      -- updated set of actors
       newActors = S.insert actor1 . S.delete actor $ stateActors s1
-   in if 0 < actorDoneTime -- no point in opening a valve if it won't have any time to flow
-        then
+   in if actorDoneTime <= 0 -- no point in opening a valve if it won't have any time to flow
+        then Nothing
+        else
           Just
             s1
               { stateActors = newActors,
                 stateToOpen = M.delete dest (stateToOpen s0)
               }
-        else Nothing
 
 -- | Advance a state by moving the clock forward to the time the next actor is available.
-advanceStateByChangingClock :: State -> Maybe State
-advanceStateByChangingClock s =
+--
+-- This change only applies if there is at least one actor, and no actor is available now.
+nextByChangingClock :: State -> Maybe State
+nextByChangingClock s =
   if null (stateActors s)
     then Nothing
     else
@@ -205,63 +277,9 @@ advanceStateByChangingClock s =
                     stateCost = stateCost s + stateCostPerSecond s * deltaT
                   }
 
-day16 :: Int -> [Actor] -> String -> (Int, [State])
-day16 remainingTime actors text =
-  let -- read the non-zero valves and their rates
-      valves = parseValves text
-      -- read the graph as presented
-      g0 = parseGraph text
-      -- compute the distances between all pairs of nodes
-      g1 = distances g0
-      -- make the initial state
-      s0 = initialState remainingTime actors valves
-      -- find the least-cost path
-      result = fromJust . solve g1 $ s0
-      (cost, path) = result
-      -- what's the cost of doing nothing, and opening no valves?
-      maxCost = remainingTime * (sum . M.elems $ valves)
-   in (maxCost - cost, path)
-
-solve :: DGraph String Int -> State -> Maybe (Int, [State])
-solve g = aStar (nextStates g) transitionCost stateEstimate isTerminal
-
--- | Cost of moving from one state to another
--- is the cost of all of the valves that aren't opened yet.
-transitionCost :: State -> State -> Int
-transitionCost s0 s1 = stateCost s1 - stateCost s0
-
-nextStates :: DGraph String Int -> State -> [State]
-nextStates g s0 =
-  catMaybes (jumpToEnd ++ changedClock ++ removedActors ++ movedActors)
-  where
-    jumpToEnd = [nextWithNoActors s0]
-    changedClock = [advanceStateByChangingClock s0]
-    removedActors =
-      [ nextByRemovingActor s0 actor
-        | actor <- S.toList $ stateActors s0,
-          actorAvailableTime actor == stateRemainingTime s0
-      ]
-    movedActors =
-      [ advanceStateByMoving g s0 actor dest
-        | actor <- S.toList $ stateActors s0,
-          actorAvailableTime actor == stateRemainingTime s0,
-          dest <- M.keys (stateToOpen s0)
-      ]
-
+-- | Is this a state where we stop searching and check the cost?
 isTerminal :: State -> Bool
 isTerminal s = stateRemainingTime s == 0
-
-traceResult :: String -> (Int, [State]) -> (Int, [State])
-traceResult lbl (s, states) = (s, traceList lbl states)
-
-traceList :: Show a => String -> [a] -> [a]
-traceList lbl = traceIt "ALL" . map (traceIt lbl)
-
-traceIt :: Show a => [Char] -> a -> a
-traceIt lbl a = trace (lbl ++ " " ++ show a) a
-
-traceGraph :: (Hashable v, Ord v, Show v, Show e) => String -> DGraph v e -> DGraph v e
-traceGraph lbl g = trace (lbl ++ "\n" ++ graphToGrid g) g
 
 -- Returns a map from valve name to flow rate for all non-zero valves.
 -- We never turn on the valves that have 0, so they don't matter.
@@ -287,18 +305,6 @@ parseArc s0 =
 replaceChar :: Char -> Char -> Char -> Char
 replaceChar a b c = if c == a then b else c
 
-graphToGrid :: (Hashable v, Ord v, Show v, Show e) => DGraph v e -> String
-graphToGrid g =
-  let vs = sort . vertices $ g
-      header = "" : map show vs
-      dataRows = map (makeDataRow g vs) vs
-      rows = header : dataRows
-   in formatGrid rows
-
-makeDataRow :: (Hashable v, Show v, Show e) => DGraph v e -> [v] -> v -> [String]
-makeDataRow g vs v =
-  show v : map (maybe "" show . graphLookup g v) vs
-
 -- | Returns the label on one edge in the graph.
 --
 -- This function is incomplete, and only covers the case where there
@@ -319,19 +325,3 @@ listToMaybe :: [a] -> Maybe a
 listToMaybe [] = Nothing
 listToMaybe [a] = Just a
 listToMaybe _ = error "more than one item in list"
-
-showMaybe :: Show a => Maybe a -> String
-showMaybe = maybe "" show
-
-formatGrid :: [[String]] -> String
-formatGrid rows =
-  let cellWidth = maximum . map length . concat $ rows
-   in unlines . map (formatLine cellWidth) $ rows
-
-formatLine :: Int -> [String] -> String
-formatLine cellWidth = unwords . map (leftPad cellWidth)
-
-leftPad :: Int -> String -> String
-leftPad n s =
-  let needed = n - length s
-   in replicate needed ' ' ++ s
