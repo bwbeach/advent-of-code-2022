@@ -79,28 +79,40 @@ showRock r =
     row y = [oneChar (V2 x y) | x <- [0 .. maxX]]
     oneChar p = if S.member p r then '#' else '.'
 
--- | A cave is represented as a set of points that have rock in them.
-newtype Cave = Cave (S.Set Point)
+-- | A cave is represented as a set of points that have rock in them, and the highest Y value of any rock.
+data Cave = Cave
+  { caveRock :: S.Set Point,
+    caveMaxY :: Int
+  }
+  deriving (Show)
 
 -- | The starting cave has just a floor at height 0.
 initialCave :: Cave
-initialCave = Cave (S.fromList [V2 x 0 | x <- [0 .. 6]])
+initialCave =
+  Cave
+    { caveRock = S.fromList [V2 x 0 | x <- [0 .. 6]],
+      caveMaxY = 0
+    }
 
 -- | Returns the Y value of the highest rock in the cave.
 caveHeight :: Cave -> Int
-caveHeight (Cave c) = maximum . map pointY . S.elems $ c
+caveHeight = caveMaxY
 
 -- | Is the given rock, at the given position, colliding with the cave?
 collision :: Cave -> Rock -> Point -> Bool
-collision (Cave c) r p = any (`S.member` c) (rockPoints r p)
+collision Cave {caveRock = c} r p = any (`S.member` c) (rockPoints r p)
 
 -- | Adds the given rock to the cave
 addRock :: Cave -> Rock -> Point -> Cave
-addRock (Cave c) r p = Cave (c `S.union` S.fromList (rockPoints r p))
+addRock c0@Cave {caveRock = cr0, caveMaxY = cmy0} r p =
+  c0
+    { caveRock = cr0 `S.union` S.fromList (rockPoints r p),
+      caveMaxY = maximum (cmy0 : map ((+ pointY p) . pointY) (S.elems r))
+    }
 
 -- | Make a human-readable cave.
 showCave :: Cave -> String
-showCave (Cave c) =
+showCave Cave {caveRock = c} =
   unlines rows
   where
     rows = [""] ++ [row y | y <- [maxY, maxY - 1 .. 1]] ++ [bottomRow]

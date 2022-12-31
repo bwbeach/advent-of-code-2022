@@ -12,6 +12,7 @@ main = do
 
 runInput :: String -> IO ()
 runInput fileName = do
+  putStrLn fileName
   rockText <- readFile "rocks.txt"
   let rocks = take 2022 . cycle . parseRocks $ rockText
   input <- readFile fileName
