@@ -7,6 +7,8 @@ module MyLib
     showRock,
     rockPoints,
     Cave,
+    addRock,
+    caveHeight,
     initialCave,
     showCave,
     Dir (..),
@@ -78,13 +80,27 @@ showRock r =
     oneChar p = if S.member p r then '#' else '.'
 
 -- | A cave is represented as a set of points that have rock in them.
-type Cave = S.Set Point
+newtype Cave = Cave (S.Set Point)
 
+-- | The starting cave has just a floor at height 0.
 initialCave :: Cave
-initialCave = S.fromList [V2 x 0 | x <- [0 .. 6]]
+initialCave = Cave (S.fromList [V2 x 0 | x <- [0 .. 6]])
 
+-- | Returns the Y value of the highest rock in the cave.
+caveHeight :: Cave -> Int
+caveHeight (Cave c) = maximum . map pointY . S.elems $ c
+
+-- | Is the given rock, at the given position, colliding with the cave?
+collision :: Cave -> Rock -> Point -> Bool
+collision (Cave c) r p = any (`S.member` c) (rockPoints r p)
+
+-- | Adds the given rock to the cave
+addRock :: Cave -> Rock -> Point -> Cave
+addRock (Cave c) r p = Cave (c `S.union` S.fromList (rockPoints r p))
+
+-- | Make a human-readable cave.
 showCave :: Cave -> String
-showCave c =
+showCave (Cave c) =
   unlines rows
   where
     rows = [""] ++ [row y | y <- [maxY, maxY - 1 .. 1]] ++ [bottomRow]
@@ -128,7 +144,3 @@ applyGravity c r p =
     else Just p'
   where
     p' = p - V2 0 1
-
--- | Is the given rock, at the given position, colliding with the cave?
-collision :: Cave -> Rock -> Point -> Bool
-collision c r p = any (`S.member` c) (rockPoints r p)

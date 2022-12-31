@@ -28,9 +28,9 @@ tests =
 tinyRock :: Rock
 tinyRock = S.fromList [V2 0 0, V2 1 0]
 
--- a cave with a rock at (3, 3)
+-- a cave with a rock at (2, 3) and (3, 3)
 tinyCave :: Cave
-tinyCave = S.fromList [V2 3 3]
+tinyCave = addRock initialCave tinyRock (V2 2 3)
 
 testApplyJetLeft :: Test
 testApplyJetLeft =
@@ -82,8 +82,8 @@ testApplyJetRightAtCave =
   TestCase
     ( assertEqual
         "moving right against cave"
-        (V2 1 3)
-        (applyJet tinyCave tinyRock (V2 1 3) RightJet)
+        (V2 0 3)
+        (applyJet tinyCave tinyRock (V2 0 3) RightJet)
     )
 
 testApplyGravityFalling :: Test

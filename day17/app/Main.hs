@@ -20,9 +20,6 @@ runInput fileName = do
   let finalState = run initialState
   print . caveHeight . stateCave $ finalState
 
-caveHeight :: Cave -> Int
-caveHeight = maximum . map pointY . S.elems
-
 -- | Run until there are no more rocks
 run :: State -> State
 run s0 =
@@ -44,16 +41,12 @@ dropRock r p0 s0 =
         Nothing -> s1 {stateCave = addRock c r p1}
         Just p2 -> dropRock r p2 s1
 
--- | Adds the given rock to the cave
-addRock :: Cave -> Rock -> Point -> Cave
-addRock c r p = c `S.union` S.fromList (rockPoints r p)
-
 -- | Where does the next rock start falling?
 startingPointForNextRock :: Cave -> Point
 startingPointForNextRock c =
   V2 2 (maxY + 4)
   where
-    maxY = maximum . map pointY . S.elems $ c
+    maxY = caveHeight c
 
 -- | The state of the computation is the configuration of the cave, and the sequence of rocks and jets.
 data State = State
