@@ -28,6 +28,8 @@ type CaveHeight = Integer
 caveHeight :: Cave -> CaveHeight
 caveHeight = toInteger . length
 
+type RockCount = Integer
+
 initialRJC :: [Rock] -> [Jet] -> RJC
 initialRJC rocks jets =
   RJC
@@ -46,7 +48,7 @@ data RJC = RJC
     -- the number of the first jet on the previous rock
     rjcPrevJetNumber :: Int,
     -- map from (rockNumber, jetNumber, topNOfCave) to (numberRemaining, cave height)
-    rjcCheckpoints :: M.Map (Int, Int, Cave) (Int, CaveHeight),
+    rjcCheckpoints :: M.Map (Int, Int, Cave) (RockCount, CaveHeight),
     -- height from repeats, not included in actual cave because we didn't actually do them
     rjcRepeatHeight :: CaveHeight
   }
@@ -57,7 +59,7 @@ rjcPeekJetNumber = fst . head . rjcJets
 rjcPeekRockNumber :: RJC -> Int
 rjcPeekRockNumber = fst . head . rjcRocks
 
-dropNRocks :: Int -> State RJC ()
+dropNRocks :: RockCount -> State RJC ()
 dropNRocks n = do
   n' <- checkForRepeat n
   if n' == 0
@@ -66,7 +68,7 @@ dropNRocks n = do
       dropRock
       dropNRocks (n' - 1)
 
-checkForRepeat :: Int -> State RJC Int
+checkForRepeat :: RockCount -> State RJC RockCount
 checkForRepeat n = do
   rjc <- get
   let jn = rjcPeekJetNumber rjc
