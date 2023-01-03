@@ -3,10 +3,22 @@
 module Main where
 
 import Control.Monad.State
+  ( MonadState (get, put),
+    State,
+    execState,
+  )
 import qualified Data.Map.Strict as M
-import Data.Maybe
-import Debug.Trace
+import Data.Maybe (fromJust)
 import MyLib
+  ( Cave,
+    Jet (..),
+    Rock,
+    addRock,
+    moveRockLeft,
+    moveRockRight,
+    parseJets,
+    parseRocks,
+  )
 
 main :: IO ()
 main = do
@@ -20,8 +32,14 @@ runWithFile fileName = do
   let rocks = parseRocks rockText
   inputText <- readFile fileName
   let jets = parseJets inputText
-  let rjc = execState (dropNRocks 2022) (initialRJC rocks jets)
-  print (rjcRepeatHeight rjc + caveHeight (rjcCave rjc) - 1)
+  print $ runWithCount rocks jets 2022
+  print $ runWithCount rocks jets 1000000000000
+
+runWithCount :: [Rock] -> [Jet] -> RockCount -> CaveHeight
+runWithCount rocks jets n =
+  rjcRepeatHeight rjc + caveHeight (rjcCave rjc) - 1
+  where
+    rjc = execState (dropNRocks n) (initialRJC rocks jets)
 
 type CaveHeight = Integer
 
@@ -29,6 +47,13 @@ caveHeight :: Cave -> CaveHeight
 caveHeight = toInteger . length
 
 type RockCount = Integer
+
+-- | how much of the cave do we save when saving checkpoints for detecting repeats
+--
+-- If a rock falls farther than this before landing, then our repeat detection
+-- may have false positives.
+caveSizeForCaching :: Int
+caveSizeForCaching = 40
 
 initialRJC :: [Rock] -> [Jet] -> RJC
 initialRJC rocks jets =
@@ -48,8 +73,10 @@ data RJC = RJC
     -- the number of the first jet on the previous rock
     rjcPrevJetNumber :: Int,
     -- map from (rockNumber, jetNumber, topNOfCave) to (numberRemaining, cave height)
+    -- used to detect repeats
     rjcCheckpoints :: M.Map (Int, Int, Cave) (RockCount, CaveHeight),
-    -- height from repeats, not included in actual cave because we didn't actually do them
+    -- height from repeats, not included in actual cave because we didn't actually do them.
+    -- when a repeat is removed, its height is added here
     rjcRepeatHeight :: CaveHeight
   }
 
@@ -76,7 +103,7 @@ checkForRepeat n = do
     then do
       let c = rjcCave rjc
       let rn = rjcPeekRockNumber rjc
-      let top = take 40 c
+      let top = take caveSizeForCaching c
       let h = caveHeight c
       let k = (rn, jn, top)
       let cp = rjcCheckpoints rjc
@@ -90,9 +117,9 @@ checkForRepeat n = do
             )
           return n
         Just (prevN, prevHeight) -> do
-          let deltaH = traceIt "deltaH" $ h - prevHeight
-          let deltaN = traceIt "deltaN" $ prevN - n
-          let nRepeats = traceIt "nRepeats" $ n `div` deltaN
+          let deltaH = h - prevHeight
+          let deltaN = prevN - n
+          let nRepeats = n `div` deltaN
           put
             ( rjc
                 { rjcCheckpoints = M.empty,
@@ -100,7 +127,7 @@ checkForRepeat n = do
                   rjcRepeatHeight = rjcRepeatHeight rjc + toInteger nRepeats * deltaH
                 }
             )
-          return (traceIt ("NNN " ++ show n ++ " ") (n - nRepeats * deltaN))
+          return (n - nRepeats * deltaN)
     else do
       put rjc {rjcPrevJetNumber = jn}
       return n
@@ -119,18 +146,15 @@ dropRockAt r y = do
   jet <- nextJet
   let r' = applyJet jet r y c
   case applyGravity r' y c of
-    Just y' -> dropRockAt r' y'
+    Just y' ->
+      if negate y' < caveSizeForCaching
+        then dropRockAt r' y'
+        else error "rock fell too far"
     Nothing -> do
       rjc' <- get
       let c' = fromJust $ addRock r' y c
       put rjc' {rjcCave = c'}
       return ()
-
-traceRock :: String -> [String] -> [String]
-traceRock lbl a = trace (lbl ++ "\n" ++ unlines a) a
-
-traceIt :: Show a => String -> a -> a
-traceIt lbl a = trace (lbl ++ " " ++ show a) a
 
 applyGravity :: Rock -> Int -> Cave -> Maybe Int
 applyGravity r y c =
@@ -147,11 +171,6 @@ applyJet jet r y c =
     r' = case jet of
       JetLeft -> moveRockLeft r
       JetRight -> moveRockRight r
-
-getCave :: State RJC Cave
-getCave = do
-  rjc <- get
-  return (rjcCave rjc)
 
 peekJetNumber :: State RJC Int
 peekJetNumber = do
@@ -178,25 +197,3 @@ nextRock = do
   let ((_, r) : rs) = rjcRocks s
   put (s {rjcRocks = rs})
   return r
-
--- dropOneRock :: ([Rock], [Jet], Cave) -> ([Rock], [Jet], Cave)
--- dropOneRock (rocks, jets, cave) =
---   (rocks', jets', cave')
---   where
---     (rock, rocks') = takeFirst rocks
---     initialOffset = length r + 3
---     (jets', cave') = dropFrom rock initialOffset cave
---     dropFrom r0 offset c = 0
-
--- applyJet :: [Jet] -> Rock -> Int -> Cave -> ([Jet], Rock)
--- applyJet jets r offset c =
---   let (j, jets') = takeFirst jets
---       r' = case j of
---         JetLeft -> moveRockLeft r
---         JetRight -> moveRockRight r
---    in case addRock r' offset c of
---         Nothing -> (jets', r)
---         Just _ -> (jets', r')
-
--- takeFirst :: [a] -> (a, [a])
--- takeFirst as = (head as, tail as)
