@@ -41,20 +41,23 @@ runWithCount rocks jets n =
   where
     rjc = execState (dropNRocks n) (initialRJC rocks jets)
 
+-- | Cave heights are more than 32 bits.  Define a type for clarity.
 type CaveHeight = Integer
 
 caveHeight :: Cave -> CaveHeight
 caveHeight = toInteger . length
 
+-- | Rock counts are more than 32 bits.  Define a type for clarity.
 type RockCount = Integer
 
--- | how much of the cave do we save when saving checkpoints for detecting repeats
+-- | How much of the cave do we save when saving checkpoints for detecting repeats?
 --
 -- If a rock falls farther than this before landing, then our repeat detection
--- may have false positives.
+-- may have false positives, so the falling rock code checks this.
 caveSizeForCaching :: Int
 caveSizeForCaching = 40
 
+-- | Initial state for the computation.
 initialRJC :: [Rock] -> [Jet] -> RJC
 initialRJC rocks jets =
   RJC
@@ -66,9 +69,13 @@ initialRJC rocks jets =
       rjcRepeatHeight = 0
     }
 
+-- | State of the computation.
 data RJC = RJC
-  { rjcRocks :: [(Int, Rock)],
+  { -- Infinite sequence of rocks to pull from when dropping rocks.
+    rjcRocks :: [(Int, Rock)],
+    -- Infinite sequence of yet-to-be-processed jets.
     rjcJets :: [(Int, Jet)],
+    -- The rocks that have fallen, plus a row of rock that is the floor of the cave.
     rjcCave :: Cave,
     -- the number of the first jet on the previous rock
     rjcPrevJetNumber :: Int,
