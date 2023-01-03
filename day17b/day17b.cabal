@@ -90,6 +90,7 @@ executable day17b
     -- Other library packages from which modules are imported.
     build-depends:
         base ^>=4.16.3.0,
+        containers,
         day17b,
         mtl
 
