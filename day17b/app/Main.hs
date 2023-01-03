@@ -21,9 +21,12 @@ runWithFile fileName = do
   inputText <- readFile fileName
   let jets = parseJets inputText
   let rjc = execState (dropNRocks 2022) (initialRJC rocks jets)
-  -- putStrLn (unlines (rjcCave rjc))
-  print (rjcCheckpoints rjc)
-  print (rjcRepeatHeight rjc + length (rjcCave rjc) - 1)
+  print (rjcRepeatHeight rjc + caveHeight (rjcCave rjc) - 1)
+
+type CaveHeight = Integer
+
+caveHeight :: Cave -> CaveHeight
+caveHeight = toInteger . length
 
 initialRJC :: [Rock] -> [Jet] -> RJC
 initialRJC rocks jets =
@@ -43,9 +46,9 @@ data RJC = RJC
     -- the number of the first jet on the previous rock
     rjcPrevJetNumber :: Int,
     -- map from (rockNumber, jetNumber, topNOfCave) to (numberRemaining, cave height)
-    rjcCheckpoints :: M.Map (Int, Int, Cave) (Int, Int),
+    rjcCheckpoints :: M.Map (Int, Int, Cave) (Int, CaveHeight),
     -- height from repeats, not included in actual cave because we didn't actually do them
-    rjcRepeatHeight :: Int
+    rjcRepeatHeight :: CaveHeight
   }
 
 rjcPeekJetNumber :: RJC -> Int
@@ -72,7 +75,7 @@ checkForRepeat n = do
       let c = rjcCave rjc
       let rn = rjcPeekRockNumber rjc
       let top = take 40 c
-      let h = length c
+      let h = caveHeight c
       let k = (rn, jn, top)
       let cp = rjcCheckpoints rjc
       case M.lookup k cp of
@@ -92,7 +95,7 @@ checkForRepeat n = do
             ( rjc
                 { rjcCheckpoints = M.empty,
                   rjcPrevJetNumber = jn,
-                  rjcRepeatHeight = rjcRepeatHeight rjc + nRepeats * deltaH
+                  rjcRepeatHeight = rjcRepeatHeight rjc + toInteger nRepeats * deltaH
                 }
             )
           return (traceIt ("NNN " ++ show n ++ " ") (n - nRepeats * deltaN))
