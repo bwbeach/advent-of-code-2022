@@ -64,7 +64,9 @@ library
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.16.3.0
+    build-depends:    
+        base ^>=4.16.3.0,
+        containers
 
     -- Directories containing source files.
     hs-source-dirs:   src
@@ -88,7 +90,9 @@ executable day19
     -- Other library packages from which modules are imported.
     build-depends:
         base ^>=4.16.3.0,
-        day19
+        containers,
+        day19,
+        split
 
     -- Directories containing source files.
     hs-source-dirs:   app
@@ -121,4 +125,6 @@ test-suite day19-test
     -- Test dependencies.
     build-depends:
         base ^>=4.16.3.0,
-        day19
+        containers,
+        day19,
+        HUnit
