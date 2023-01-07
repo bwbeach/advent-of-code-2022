@@ -13,13 +13,23 @@ main = do
 tests :: Test
 tests =
   TestList
-    [ testTimeUntilN,
+    [ testLex,
+      testTimeUntilN,
       testBestPossible0,
       testBestPossible1,
       testBestPossible2,
       testBestPossible3,
       testTimeUntilClay
     ]
+
+testLex :: Test
+testLex =
+  TestCase
+    ( assertEqual
+        "adventLex"
+        [Token "a" 1 1, Token "3" 1 3, Token "." 1 4, Token "=" 2 1, Token "400" 2 2]
+        (adventLex "a 3.\n=400")
+    )
 
 testTimeUntilN :: Test
 testTimeUntilN =

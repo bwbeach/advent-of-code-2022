@@ -6,9 +6,12 @@ module MyLib
     bestPossibleScore,
     timeUntil,
     timeUntilN,
+    adventLex,
+    Token (..),
   )
 where
 
+import Data.Char
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import Debug.Trace
@@ -99,3 +102,80 @@ timeUntilN n =
 
 traceIt :: Show a => [Char] -> a -> a
 traceIt lbl x = trace (lbl ++ " " ++ show x) x
+
+-- | Turns a string into a sequence of tokens for parsing.
+--
+-- The intention here is to create a generic lexer that works for most
+-- Advent of Code problems that require parsing.  Whitespace separates
+-- tokens, and a switch between "operator" characters and "identifier"
+-- characters also separates tokens.
+adventLex :: String -> [Token]
+adventLex s =
+  reverse (lexTokensSoFar finalState)
+  where
+    initialState =
+      LexState
+        { lexLine = 1,
+          lexColumn = 0,
+          lexTokenSoFar = Nothing,
+          lexTokensSoFar = []
+        }
+    finalState = foldl lexOneChar initialState (s ++ " ")
+
+lexOneChar :: LexState -> Char -> LexState
+lexOneChar s0 c =
+  go s1
+  where
+    s1 = advanceCharPos s0 c
+    line = lexLine s1
+    column = lexColumn s1
+    go s2 =
+      case lexTokenSoFar s2 of
+        Just (t2, sameToken) ->
+          if sameToken c
+            then
+              s2
+                { lexTokenSoFar = Just (addToToken c t2, sameToken)
+                }
+            else
+              go
+                s2
+                  { lexTokenSoFar = Nothing,
+                    lexTokensSoFar = finishToken t2 : lexTokensSoFar s2
+                  }
+        Nothing ->
+          if isSpace c
+            then s2
+            else
+              if isAlphaNum c
+                then s2 {lexTokenSoFar = Just (newToken c line column, isAlphaNum)}
+                else s2 {lexTokenSoFar = Just (newToken c line column, const False)}
+
+advanceCharPos :: LexState -> Char -> LexState
+advanceCharPos s c =
+  if c == '\n'
+    then s {lexLine = lexLine s + 1, lexColumn = 0}
+    else s {lexColumn = lexColumn s + 1}
+
+-- | The state of a lexing operation.
+data LexState = LexState
+  { lexLine :: Int, -- line num of prev char read
+    lexColumn :: Int, -- column num of prev char read
+    lexTokenSoFar :: Maybe (Token, Char -> Bool), -- the token we are building and the predicate on chars that go in it
+    lexTokensSoFar :: [Token] -- the completed tokens so far
+  }
+
+-- | A token used by the parser.
+--
+-- Includes the string that is the token, and the line number and
+-- character position of the start of the token.
+data Token = Token String Int Int deriving (Eq, Ord, Show)
+
+newToken :: Char -> Int -> Int -> Token
+newToken c = Token [c]
+
+addToToken :: Char -> Token -> Token
+addToToken c (Token cs line column) = Token (c : cs) line column
+
+finishToken :: Token -> Token
+finishToken (Token cs line column) = Token (reverse cs) line column
