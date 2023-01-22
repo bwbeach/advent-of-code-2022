@@ -35,10 +35,6 @@ data Thing
   | Robot Resource
   deriving (Eq, Ord, Show)
 
-isRobot :: Thing -> Bool
-isRobot (Res _) = False
-isRobot (Robot _) = True
-
 -- | A recipe for creating robots.
 --
 -- Maps from a (Robot r) to the (n, Thing) pairs needed to make one.

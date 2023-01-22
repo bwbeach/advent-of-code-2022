@@ -1,4 +1,4 @@
-module Main where
+module Main (main) where
 
 import Algorithm.Search
 import Data.Char
@@ -17,23 +17,36 @@ runWithFile :: String -> IO ()
 runWithFile fileName = do
   putStrLn fileName
   input <- readFile fileName
-  print . day19 $ input
+  print . day19a $ input
 
-day19 :: String -> Int
-day19 = sum . map runOne . parseInput
+-- print . day19b $ input
+
+day19a :: String -> Int
+day19a = sum . map runOne . parseInput
+
+day19b :: String -> Int
+day19b = product . map (maxGeodes 32 . snd) . atMost 3 . parseInput
+
+atMost :: Int -> [a] -> [a]
+atMost 0 _ = []
+atMost _ [] = []
+atMost n (a : as) = a : atMost (n - 1) as
 
 runOne :: (Int, Recipe) -> Int
 runOne (blueprintNumber, recipe) =
-  traceIt ("AAA " ++ show blueprintNumber) $ blueprintNumber * maxGeodes
+  traceIt ("AAA " ++ show blueprintNumber) $ blueprintNumber * maxGeodes 24 recipe
+
+maxGeodes :: Int -> Recipe -> Int
+maxGeodes maxTime recipe =
+  traceIt ("BBB " ++ show maxTime) $ nodeHowMany best (Res Geode)
   where
-    maxGeodes = nodeHowMany best (Res Geode)
     best = last . snd . fromJust $ solution
     solution = aStar (nodeSuccessors recipe) edgeCost nodeRemainingCost isLeaf initialState
     isLeaf n = nodeTimeLeft n == 0
     nodeRemainingCost = const 0
     edgeCost n0 n1 = bestScore n0 - bestScore n1
     bestScore = bestPossibleScore recipe
-    initialState = Node {nodeCounts = M.fromList [(Robot Ore, 1)], nodeTimeLeft = 24}
+    initialState = Node {nodeCounts = M.fromList [(Robot Ore, 1)], nodeTimeLeft = maxTime}
 
 parseInput :: String -> [(Int, Recipe)]
 parseInput = map parseRecipe . startBy "Blueprint"
