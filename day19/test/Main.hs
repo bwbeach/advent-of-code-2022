@@ -1,6 +1,7 @@
 module Main (main) where
 
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 import MyLib
 import qualified System.Exit as Exit
 import Test.HUnit (Test (..), assertEqual, failures, runTestTT)
@@ -13,23 +14,17 @@ main = do
 tests :: Test
 tests =
   TestList
-    [ testLex,
-      testTimeUntilN,
+    [ testTimeUntilN,
       testBestPossible0,
       testBestPossible1,
       testBestPossible2,
       testBestPossible3,
-      testTimeUntilClay
+      testTimeUntilClay,
+      testNodeSuccessors,
+      testRemoveResources,
+      testRemoveResources2,
+      testRunRobots
     ]
-
-testLex :: Test
-testLex =
-  TestCase
-    ( assertEqual
-        "adventLex"
-        [Token "a" 1 1, Token "3" 1 3, Token "." 1 4, Token "=" 2 1, Token "400" 2 2]
-        (adventLex "a 3.\n=400")
-    )
 
 testTimeUntilN :: Test
 testTimeUntilN =
@@ -104,8 +99,8 @@ testBestPossible2 =
         (bestPossibleScore recipe1 (nodeWithOneGeodeRobot 3))
     )
 
-nodeWithOre :: Node
-nodeWithOre = Node {nodeCounts = M.fromList [(Robot Ore, 1)], nodeTimeLeft = 15}
+nodeWithOreRobot :: Node
+nodeWithOreRobot = Node {nodeCounts = M.fromList [(Robot Ore, 1)], nodeTimeLeft = 15}
 
 -- start with one ore robot, which will produce an ore at time 1,
 -- which will allow a clay robot at time 2, which will produce a clay at time 3,
@@ -118,7 +113,7 @@ testBestPossible3 =
     ( assertEqual
         "possible3"
         1
-        (bestPossibleScore recipe1 nodeWithOre)
+        (bestPossibleScore recipe1 nodeWithOreRobot)
     )
 
 testTimeUntilClay :: Test
@@ -127,5 +122,64 @@ testTimeUntilClay =
     ( assertEqual
         "timeUntilClay"
         3
-        (timeUntil recipe1 nodeWithOre (Res Clay))
+        (timeUntil recipe1 nodeWithOreRobot (Res Clay))
+    )
+
+nodeWithTenOre :: Node
+nodeWithTenOre =
+  Node
+    { nodeCounts = M.fromList [(Res Ore, 10)],
+      nodeTimeLeft = 15
+    }
+
+recipe2 =
+  Recipe
+    ( M.fromList
+        [ (Robot Geode, [(45, Res Obsidian)]), -- 45! it takes a lot of obsidian
+          (Robot Obsidian, [(1, Res Ore)]),
+          (Robot Clay, [(2, Res Ore)]),
+          (Robot Ore, [(4, Res Ore)])
+        ]
+    )
+
+testNodeSuccessors :: Test
+testNodeSuccessors =
+  TestCase
+    ( assertEqual
+        "nodeSuccessors"
+        ( S.fromList
+            [ Node {nodeCounts = M.fromList [(Res Ore, 10)], nodeTimeLeft = 14},
+              Node {nodeCounts = M.fromList [(Res Ore, 9), (Robot Obsidian, 1)], nodeTimeLeft = 14},
+              Node {nodeCounts = M.fromList [(Res Ore, 8), (Robot Clay, 1)], nodeTimeLeft = 14},
+              Node {nodeCounts = M.fromList [(Res Ore, 6), (Robot Ore, 1)], nodeTimeLeft = 14}
+            ]
+        )
+        (S.fromList (nodeSuccessors recipe2 nodeWithTenOre))
+    )
+
+testRemoveResources :: Test
+testRemoveResources =
+  TestCase
+    ( assertEqual
+        "removeResources"
+        (Just (Node {nodeCounts = M.fromList [(Res Ore, 9)], nodeTimeLeft = 15}))
+        (removeResources nodeWithTenOre [(1, Res Ore)])
+    )
+
+testRemoveResources2 :: Test
+testRemoveResources2 =
+  TestCase
+    ( assertEqual
+        "removeResources"
+        Nothing
+        (removeResources nodeWithTenOre [(11, Res Ore)])
+    )
+
+testRunRobots :: Test
+testRunRobots =
+  TestCase
+    ( assertEqual
+        "runRobots"
+        (Node {nodeCounts = M.fromList [(Robot Ore, 1), (Res Ore, 1)], nodeTimeLeft = 15})
+        (runRobots nodeWithOreRobot)
     )

@@ -6,9 +6,13 @@ module MyLib
     bestPossibleScore,
     timeUntil,
     timeUntilN,
+    nodeSuccessors,
+    removeResources,
+    runRobots,
   )
 where
 
+import Control.Monad
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import Debug.Trace
@@ -30,6 +34,25 @@ data Thing
   | Robot Resource
   deriving (Eq, Ord, Show)
 
+isRobot :: Thing -> Bool
+isRobot (Res _) = False
+isRobot (Robot _) = True
+
+-- | A recipe for creating robots.
+--
+-- Maps from a (Robot r) to the (n, Thing) pairs needed to make one.
+newtype Recipe = Recipe (M.Map Thing [(Int, Thing)]) deriving (Eq, Ord, Show)
+
+-- | What do you need to get a thing?
+precursors :: Recipe -> Thing -> [(Int, Thing)]
+precursors (Recipe r) t =
+  case t of
+    -- To make a resource, you need one robot for that resource.
+    (Res x) -> [(1, Robot x)]
+    -- To make a robot, you need whatever the recipe specifies.
+    -- We expect a recipe to have something for every robot type.
+    (Robot _) -> fromJust . M.lookup t $ r
+
 -- | A node in the search tree has counts for resources and robots.
 data Node = Node
   { -- how many of each resource and robot type we have
@@ -42,16 +65,6 @@ data Node = Node
 -- | How many of the given thing are there?
 nodeHowMany :: Node -> Thing -> Int
 nodeHowMany n t = fromMaybe 0 . M.lookup t $ nodeCounts n
-
--- | A recipe for creating robots.
---
--- Maps from a robot to the (n, resource) pairs needed to make one.
-newtype Recipe = Recipe (M.Map Thing [(Int, Thing)]) deriving (Eq, Ord, Show)
-
--- | What do you need to get a thing?
-precursors :: Recipe -> Thing -> [(Int, Thing)]
-precursors _ (Res x) = [(1, Robot x)]
-precursors (Recipe r) t@(Robot _) = fromMaybe [] . M.lookup t $ r
 
 -- | What's the best possible score that could come from this Node?
 bestPossibleScore :: Recipe -> Node -> Int
@@ -99,6 +112,63 @@ timeUntilN n =
     a = 0.5 :: Double
     b = 0.5
     c = fromIntegral (negate n)
+
+-- | What are all of the successors of a search node?
+--
+-- The choice is what kind of robot to make, if any.  We're allowed
+-- to create just one robot in each time interval.  Sometimes, though
+-- we might want to skip making one so we have the resources to make
+-- something else later.
+--
+-- The sequencing is:
+--   (1) take out resources needed to make new robot
+--   (2) add resources based on existing robots
+--   (3) add new robot
+--   (4) advance the clock
+nodeSuccessors :: Recipe -> Node -> [Node]
+nodeSuccessors recipe step0 =
+  [ step4
+    | ((nToAdd, tToAdd), resourcesNeeded) <- possibleRecipes recipe,
+      step1 <- maybeToList (removeResources step0 resourcesNeeded),
+      let step2 = runRobots step1,
+      let step3 = nodeAdd nToAdd tToAdd step2,
+      let step4 = step3 {nodeTimeLeft = nodeTimeLeft step3 - 1}
+  ]
+
+possibleRecipes :: Recipe -> [((Int, Thing), [(Int, Thing)])]
+possibleRecipes (Recipe m) =
+  ((0, Robot Ore), [])
+    : [ ((1, t), inputs)
+        | (t, inputs) <- M.toList m
+      ]
+
+removeResources :: Node -> [(Int, Thing)] -> Maybe Node
+removeResources =
+  foldM removeOne
+  where
+    removeOne a (n, t) =
+      if n <= nBefore
+        then Just $ nodeAdd (negate n) t a
+        else Nothing
+      where
+        nBefore = nodeHowMany a t
+
+runRobots :: Node -> Node
+runRobots node =
+  foldl runOne node (M.toList . nodeCounts $ node)
+  where
+    runOne node0 (t, n) =
+      case t of
+        Res _ -> node0
+        Robot x -> nodeAdd n (Res x) node0
+
+nodeAdd :: Int -> Thing -> Node -> Node
+nodeAdd 0 _ node = node
+nodeAdd n t node =
+  node {nodeCounts = M.insert t (n0 + n) counts0}
+  where
+    n0 = fromMaybe 0 . M.lookup t $ counts0
+    counts0 = nodeCounts node
 
 traceIt :: Show a => [Char] -> a -> a
 traceIt lbl x = trace (lbl ++ " " ++ show x) x
