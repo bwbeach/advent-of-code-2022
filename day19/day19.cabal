@@ -92,6 +92,7 @@ executable day19
         base ^>=4.16.3.0,
         containers,
         day19,
+        search-algorithms,
         split
 
     -- Directories containing source files.

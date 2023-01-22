@@ -1,8 +1,10 @@
 module Main where
 
+import Algorithm.Search
 import Data.Char
 import Data.List.Split
 import qualified Data.Map.Strict as M
+import Data.Maybe
 import Debug.Trace
 import MyLib
 
@@ -13,11 +15,25 @@ main = do
 
 runWithFile :: String -> IO ()
 runWithFile fileName = do
+  putStrLn fileName
   input <- readFile fileName
   print . day19 $ input
 
-day19 :: String -> String
-day19 = show . parseInput
+day19 :: String -> Int
+day19 = sum . map runOne . parseInput
+
+runOne :: (Int, Recipe) -> Int
+runOne (blueprintNumber, recipe) =
+  traceIt ("AAA " ++ show blueprintNumber) $ blueprintNumber * maxGeodes
+  where
+    maxGeodes = nodeHowMany best (Res Geode)
+    best = last . snd . fromJust $ solution
+    solution = aStar (nodeSuccessors recipe) edgeCost nodeRemainingCost isLeaf initialState
+    isLeaf n = nodeTimeLeft n == 0
+    nodeRemainingCost = const 0
+    edgeCost n0 n1 = bestScore n0 - bestScore n1
+    bestScore = bestPossibleScore recipe
+    initialState = Node {nodeCounts = M.fromList [(Robot Ore, 1)], nodeTimeLeft = 24}
 
 parseInput :: String -> [(Int, Recipe)]
 parseInput = map parseRecipe . startBy "Blueprint"
@@ -38,7 +54,7 @@ parseElem :: String -> (Thing, [(Int, Thing)])
 parseElem s =
   (Robot target, inputs)
   where
-    s' = replaceChar '.' ' ' (traceIt "ELEM" s)
+    s' = replaceChar '.' ' ' s
     ws = words s'
     target = read (capitalize (head ws))
     inputs = parseInputs (drop 3 ws)

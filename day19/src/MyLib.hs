@@ -2,6 +2,7 @@ module MyLib
   ( Resource (..),
     Thing (..),
     Node (..),
+    nodeHowMany,
     Recipe (..),
     bestPossibleScore,
     timeUntil,
