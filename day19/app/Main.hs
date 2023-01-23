@@ -59,7 +59,7 @@ parseRecipe text =
   case splitOn ":" text of
     [a, b] ->
       ( read . head . words $ a,
-        Recipe . M.fromList . map parseElem . startBy "Each" . dropWhile isSpace . replaceChar '\n' ' ' $ b
+        makeRecipe . M.fromList . map parseElem . startBy "Each" . dropWhile isSpace . replaceChar '\n' ' ' $ b
       )
     _ -> error ("bad recipe: " ++ text)
 

@@ -3,7 +3,8 @@ module MyLib
     Thing (..),
     Node (..),
     nodeHowMany,
-    Recipe (..),
+    Recipe,
+    makeRecipe,
     bestPossibleScore,
     timeUntil,
     timeUntilN,
@@ -38,17 +39,26 @@ data Thing
 -- | A recipe for creating robots.
 --
 -- Maps from a (Robot r) to the (n, Thing) pairs needed to make one.
-newtype Recipe = Recipe (M.Map Thing [(Int, Thing)]) deriving (Eq, Ord, Show)
+data Recipe = Recipe (M.Map Thing [(Int, Thing)]) (M.Map Thing Int) deriving (Eq, Ord, Show)
+
+makeRecipe :: M.Map Thing [(Int, Thing)] -> Recipe
+makeRecipe ingredients = Recipe ingredients M.empty
+
+recipeIngredients :: Recipe -> M.Map Thing [(Int, Thing)]
+recipeIngredients (Recipe m _) = m
+
+recipeInputs :: Recipe -> Thing -> [(Int, Thing)]
+recipeInputs (Recipe m _) t = fromJust . M.lookup t $ m
 
 -- | What do you need to get a thing?
 precursors :: Recipe -> Thing -> [(Int, Thing)]
-precursors (Recipe r) t =
+precursors r t =
   case t of
     -- To make a resource, you need one robot for that resource.
     (Res x) -> [(1, Robot x)]
     -- To make a robot, you need whatever the recipe specifies.
     -- We expect a recipe to have something for every robot type.
-    (Robot _) -> fromJust . M.lookup t $ r
+    (Robot _) -> recipeInputs r t
 
 -- | A node in the search tree has counts for resources and robots.
 data Node = Node
@@ -133,10 +143,10 @@ nodeSuccessors recipe step0 =
   ]
 
 possibleRecipes :: Recipe -> [((Int, Thing), [(Int, Thing)])]
-possibleRecipes (Recipe m) =
+possibleRecipes r =
   ((0, Robot Ore), [])
     : [ ((1, t), inputs)
-        | (t, inputs) <- M.toList m
+        | (t, inputs) <- M.toList (recipeIngredients r)
       ]
 
 removeResources :: Node -> [(Int, Thing)] -> Maybe Node

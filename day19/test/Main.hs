@@ -37,7 +37,7 @@ testTimeUntilN =
 
 recipe1 :: Recipe
 recipe1 =
-  Recipe
+  makeRecipe
     ( M.fromList
         [ (Robot Geode, [(45, Res Obsidian)]), -- 45! it takes a lot of obsidian
           (Robot Obsidian, [(1, Res Clay)]),
@@ -132,8 +132,9 @@ nodeWithTenOre =
       nodeTimeLeft = 15
     }
 
+recipe2 :: Recipe
 recipe2 =
-  Recipe
+  makeRecipe
     ( M.fromList
         [ (Robot Geode, [(45, Res Obsidian)]), -- 45! it takes a lot of obsidian
           (Robot Obsidian, [(1, Res Ore)]),
