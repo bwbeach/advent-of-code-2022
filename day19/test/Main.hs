@@ -23,7 +23,8 @@ tests =
       testNodeSuccessors,
       testRemoveResources,
       testRemoveResources2,
-      testRunRobots
+      testRunRobots,
+      testFindMaxima
     ]
 
 testTimeUntilN :: Test
@@ -128,7 +129,7 @@ testTimeUntilClay =
 nodeWithTenOre :: Node
 nodeWithTenOre =
   Node
-    { nodeCounts = M.fromList [(Res Ore, 10)],
+    { nodeCounts = M.fromList [(Res Ore, 10), (Robot Ore, 5)],
       nodeTimeLeft = 15
     }
 
@@ -136,7 +137,7 @@ recipe2 :: Recipe
 recipe2 =
   makeRecipe
     ( M.fromList
-        [ (Robot Geode, [(45, Res Obsidian)]), -- 45! it takes a lot of obsidian
+        [ (Robot Geode, [(45, Res Obsidian), (45, Res Ore)]), -- 45! it takes a lot of obsidian
           (Robot Obsidian, [(1, Res Ore)]),
           (Robot Clay, [(2, Res Ore)]),
           (Robot Ore, [(4, Res Ore)])
@@ -149,10 +150,9 @@ testNodeSuccessors =
     ( assertEqual
         "nodeSuccessors"
         ( S.fromList
-            [ Node {nodeCounts = M.fromList [(Res Ore, 10)], nodeTimeLeft = 14},
-              Node {nodeCounts = M.fromList [(Res Ore, 9), (Robot Obsidian, 1)], nodeTimeLeft = 14},
-              Node {nodeCounts = M.fromList [(Res Ore, 8), (Robot Clay, 1)], nodeTimeLeft = 14},
-              Node {nodeCounts = M.fromList [(Res Ore, 6), (Robot Ore, 1)], nodeTimeLeft = 14}
+            [ Node {nodeCounts = M.fromList [(Res Ore, 15), (Robot Ore, 5)], nodeTimeLeft = 14},
+              Node {nodeCounts = M.fromList [(Res Ore, 14), (Robot Ore, 5), (Robot Obsidian, 1)], nodeTimeLeft = 14},
+              Node {nodeCounts = M.fromList [(Res Ore, 11), (Robot Ore, 6)], nodeTimeLeft = 14}
             ]
         )
         (S.fromList (nodeSuccessors recipe2 nodeWithTenOre))
@@ -163,7 +163,7 @@ testRemoveResources =
   TestCase
     ( assertEqual
         "removeResources"
-        (Just (Node {nodeCounts = M.fromList [(Res Ore, 9)], nodeTimeLeft = 15}))
+        (Just (Node {nodeCounts = M.fromList [(Res Ore, 9), (Robot Ore, 5)], nodeTimeLeft = 15}))
         (removeResources nodeWithTenOre [(1, Res Ore)])
     )
 
@@ -183,4 +183,13 @@ testRunRobots =
         "runRobots"
         (Node {nodeCounts = M.fromList [(Robot Ore, 1), (Res Ore, 1)], nodeTimeLeft = 15})
         (runRobots nodeWithOreRobot)
+    )
+
+testFindMaxima :: Test
+testFindMaxima =
+  TestCase
+    ( assertEqual
+        "findMaxima"
+        (M.fromList [(Robot Ore, 5), (Robot Clay, 0), (Robot Obsidian, 0)])
+        (findMaxima (M.fromList [(Robot Ore, [(5, Res Ore)])]))
     )

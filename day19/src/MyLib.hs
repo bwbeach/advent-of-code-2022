@@ -5,6 +5,7 @@ module MyLib
     nodeHowMany,
     Recipe,
     makeRecipe,
+    findMaxima,
     bestPossibleScore,
     timeUntil,
     timeUntilN,
@@ -18,6 +19,7 @@ import Control.Monad
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import Debug.Trace
+import Safe.Foldable
 
 -- | Resources
 data Resource
@@ -26,6 +28,9 @@ data Resource
   | Obsidian
   | Geode
   deriving (Eq, Ord, Read, Show)
+
+allResources :: [Resource]
+allResources = [Ore, Clay, Obsidian, Geode]
 
 -- | The resources and the robots used to create them
 --
@@ -42,13 +47,28 @@ data Thing
 data Recipe = Recipe (M.Map Thing [(Int, Thing)]) (M.Map Thing Int) deriving (Eq, Ord, Show)
 
 makeRecipe :: M.Map Thing [(Int, Thing)] -> Recipe
-makeRecipe ingredients = Recipe ingredients M.empty
+makeRecipe ingredients = Recipe ingredients (findMaxima ingredients)
 
 recipeIngredients :: Recipe -> M.Map Thing [(Int, Thing)]
 recipeIngredients (Recipe m _) = m
 
 recipeInputs :: Recipe -> Thing -> [(Int, Thing)]
 recipeInputs (Recipe m _) t = fromJust . M.lookup t $ m
+
+recipeMaxNeeded :: Recipe -> Thing -> Int
+recipeMaxNeeded (Recipe _ m) t = fromJust . M.lookup t $ m
+
+-- | Computes the maximum number of each type of robot needed.
+findMaxima :: M.Map Thing [(Int, Thing)] -> M.Map Thing Int
+findMaxima m =
+  M.fromList
+    [ (Robot r, maxNeeded)
+      | r <- allResources,
+        r /= Geode,
+        let maxNeeded = fromMaybe 0 . maximumMay . map fst . filter (isRes r . snd) . concat . M.elems $ m
+    ]
+  where
+    isRes r x = x == Res r
 
 -- | What do you need to get a thing?
 precursors :: Recipe -> Thing -> [(Int, Thing)]
@@ -67,7 +87,15 @@ data Node = Node
     -- how much time is remaining
     nodeTimeLeft :: Int
   }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance Show Node where
+  show node = timeLeft ++ ":" ++ resources ++ ":" ++ robots
+    where
+      timeLeft = show . nodeTimeLeft $ node
+      resources = makeCounts Res
+      robots = makeCounts Robot
+      makeCounts kind = show [nodeHowMany node (kind r) | r <- allResources]
 
 -- | How many of the given thing are there?
 nodeHowMany :: Node -> Thing -> Int
@@ -132,15 +160,25 @@ timeUntilN n =
 --   (2) add resources based on existing robots
 --   (3) add new robot
 --   (4) advance the clock
+--
+-- The "wantToAdd" check is from a clue I found on Reddit.  There's no
+-- need to have more robots for a resource that the biggest number for
+-- that resource in recipes.
 nodeSuccessors :: Recipe -> Node -> [Node]
 nodeSuccessors recipe step0 =
   [ step4
     | ((nToAdd, tToAdd), resourcesNeeded) <- possibleRecipes recipe,
+      wantToAdd recipe tToAdd (nodeHowMany step0 tToAdd),
       step1 <- maybeToList (removeResources step0 resourcesNeeded),
       let step2 = runRobots step1,
       let step3 = nodeAdd nToAdd tToAdd step2,
       let step4 = step3 {nodeTimeLeft = nodeTimeLeft step3 - 1}
   ]
+
+wantToAdd :: Recipe -> Thing -> Int -> Bool
+wantToAdd _ (Robot Geode) _ = True
+wantToAdd recipe t@(Robot _) alreadyHave = alreadyHave < recipeMaxNeeded recipe t
+wantToAdd _ _ _ = False
 
 possibleRecipes :: Recipe -> [((Int, Thing), [(Int, Thing)])]
 possibleRecipes r =
