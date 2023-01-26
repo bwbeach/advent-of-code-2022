@@ -18,8 +18,7 @@ runWithFile fileName = do
   putStrLn fileName
   input <- readFile fileName
   print . day19a $ input
-
--- print . day19b $ input
+  print . day19b $ input
 
 day19a :: String -> Int
 day19a = sum . map runOne . parseInput
