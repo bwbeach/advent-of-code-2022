@@ -41,7 +41,8 @@ moveOne len state n =
   where
     -- we always move forward.  with a negative number, we wrap the
     -- circular list and move it forward.  The moving forward happens
-    -- in a list that does not have n it, so the modulus is (len - 1).
+    -- by jumping over all of the numbers *except* n, so after jumping
+    -- over (len - 1), it's back to the same place.
     delta = n `mod` (len - 1)
     -- make a list, starting with the number after n, that is at least long enough
     afterN = drop 1 . dropWhile (/= n) $ (state ++ state)
