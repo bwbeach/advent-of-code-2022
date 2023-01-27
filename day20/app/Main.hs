@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Data.Int (Int64)
 import Data.List (elemIndex)
 import Data.Maybe (fromJust)
 
@@ -15,11 +16,14 @@ runWithFile fileName = do
   let numbers = map read . lines $ input
   print . day20 $ numbers
 
-day20 :: [Int] -> Int
+-- | For part 2 we need numbers bigger than ints, so define a type
+type Value = Int64
+
+day20 :: [Value] -> Value
 day20 numbers = coords (mix numbers numbers)
 
 -- | Add the coordinates
-coords :: [Int] -> Int
+coords :: [Value] -> Value
 coords ns =
   sum . map nthAfterZero $ [1000, 2000, 3000]
   where
@@ -28,14 +32,14 @@ coords ns =
     nthAfterZero i = ns !! ((i + indexOfZero) `mod` len)
 
 -- | Perform a full mixing
-mix :: [Int] -> [Int] -> [Int]
+mix :: [Value] -> [Value] -> [Value]
 mix spec state =
   foldl (moveOne len) state spec
   where
     len = length spec
 
 -- | Moves one number to a new place.
-moveOne :: Int -> [Int] -> Int -> [Int]
+moveOne :: Int -> [Value] -> Value -> [Value]
 moveOne len state n =
   before ++ [n] ++ after
   where
@@ -43,7 +47,7 @@ moveOne len state n =
     -- circular list and move it forward.  The moving forward happens
     -- by jumping over all of the numbers *except* n, so after jumping
     -- over (len - 1), it's back to the same place.
-    delta = n `mod` (len - 1)
+    delta = fromEnum $ n `mod` (toEnum len - 1)
     -- make a list, starting with the number after n, that is at least long enough
     afterN = drop 1 . dropWhile (/= n) $ (state ++ state)
     -- break the list at the point where n will be inserted
