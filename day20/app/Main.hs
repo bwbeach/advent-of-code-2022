@@ -3,6 +3,7 @@ module Main (main) where
 import Data.Int (Int64)
 import Data.List (elemIndex)
 import Data.Maybe (fromJust)
+import Debug.Trace
 
 main :: IO ()
 main = do
@@ -14,13 +15,27 @@ runWithFile fileName = do
   input <- readFile fileName
   putStrLn fileName
   let numbers = map read . lines $ input
-  print . day20 $ numbers
+  print . day20a $ numbers
+  print . day20b $ numbers
 
 -- | For part 2 we need numbers bigger than ints, so define a type
-type Value = Int64
+type Value = Integer
 
-day20 :: [Value] -> Value
-day20 numbers = coords (mix numbers numbers)
+-- | Part 1
+day20a :: [Value] -> Value
+day20a numbers = coords (mix numbers numbers)
+
+-- | Part 2
+day20b :: [Value] -> Value
+day20b numbers =
+  coords . nTimes 10 mixOnce $ bigNumbers
+  where
+    mixOnce = mix bigNumbers
+    bigNumbers = map (* 811589153) numbers
+
+-- | Apply a function to a value n times
+nTimes :: Int -> (a -> a) -> a -> a
+nTimes n f x = iterate f x !! n
 
 -- | Add the coordinates
 coords :: [Value] -> Value
@@ -54,3 +69,6 @@ moveOne len state n =
     (before, later) = splitAt delta afterN
     -- the 'later' part may be too long, so trim it down
     after = take (len - delta - 1) later
+
+traceIt :: Show a => [Char] -> a -> a
+traceIt label x = trace (label ++ " " ++ show x) x
