@@ -88,6 +88,7 @@ executable day21b
     -- Other library packages from which modules are imported.
     build-depends:
         base ^>=4.16.4.0,
+        containers,
         day21b
 
     -- Directories containing source files.
