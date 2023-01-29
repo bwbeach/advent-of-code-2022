@@ -27,17 +27,10 @@ day22a :: Grid -> [Instruction] -> State
 day22a grid =
   foldl applyInstruction startState
   where
-    startState = (grid, startingPoint grid, V2 1 0)
+    startState = (grid, startingPoint grid, right)
 
 day22aCode :: State -> Int
 day22aCode (_, V2 x y, d) = y * 1000 + 4 * x + dirCode d
-
-dirCode :: V2 Int -> Int
-dirCode (V2 1 0) = 0
-dirCode (V2 (-1) 0) = 2
-dirCode (V2 0 (-1)) = 3
-dirCode (V2 0 1) = 1
-dirCode v = error ("bad direction: " ++ show v)
 
 parseInput :: String -> (Grid, [Instruction])
 parseInput text =
@@ -70,7 +63,7 @@ startingPoint g =
     isDot p = gridLookup p g == Just '.'
 
 -- | As we're moving around, our state is the grid, plus our position and direction.
-type State = (Grid, V2 Int, V2 Int)
+type State = (Grid, V2 Int, Dir)
 
 applyInstruction :: State -> Instruction -> State
 applyInstruction s@(grid, pos0, dir0) instr =
@@ -78,15 +71,6 @@ applyInstruction s@(grid, pos0, dir0) instr =
     TurnLeft -> (grid, pos0, turnLeft dir0)
     TurnRight -> (grid, pos0, turnRight dir0)
     Move n -> move s n
-
-turnLeft :: V2 Int -> V2 Int
-turnLeft (V2 x y) = V2 y (negate x)
-
-turnRight :: V2 Int -> V2 Int
-turnRight (V2 x y) = V2 (negate y) x
-
-turnAround :: V2 Int -> V2 Int
-turnAround (V2 x y) = V2 (negate x) (negate y)
 
 -- | Move n positions form where we are in the direction we're facing, or until hitting a wall.
 move :: State -> Int -> State
@@ -110,12 +94,43 @@ move s@(grid, pos, dir) n =
       where
         p' = p + turnAround d
 
-dirChar :: V2 Int -> Char
+-- | A direction is represented as a unit vector
+type Dir = V2 Int
+
+up :: Dir
+up = V2 0 (-1)
+
+down :: Dir
+down = V2 0 1
+
+left :: Dir
+left = V2 (-1) 0
+
+right :: Dir
+right = V2 1 0
+
+turnLeft :: Dir -> Dir
+turnLeft (V2 x y) = V2 y (negate x)
+
+turnRight :: Dir -> Dir
+turnRight (V2 x y) = V2 (negate y) x
+
+turnAround :: Dir -> Dir
+turnAround (V2 x y) = V2 (negate x) (negate y)
+
+dirChar :: Dir -> Char
 dirChar (V2 1 0) = '>'
 dirChar (V2 (-1) 0) = '<'
 dirChar (V2 0 (-1)) = '^'
 dirChar (V2 0 1) = 'v'
 dirChar v = error ("bad direction: " ++ show v)
+
+dirCode :: Dir -> Int
+dirCode (V2 1 0) = 0
+dirCode (V2 (-1) 0) = 2
+dirCode (V2 0 (-1)) = 3
+dirCode (V2 0 1) = 1
+dirCode v = error ("bad direction: " ++ show v)
 
 traceIt :: Show a => [Char] -> a -> a
 traceIt lbl x = trace (lbl ++ " " ++ show x) x
