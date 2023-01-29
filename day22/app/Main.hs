@@ -18,9 +18,9 @@ runWithFile fileName = do
   text <- readFile fileName
   let (grid, instructions) = parseInput text
   let result = day22a grid instructions
-  let (resultGrid, _, _) = result
-  putStrLn "\n"
-  putStrLn . unlines . gridToStrings $ resultGrid
+  -- let (resultGrid, _, _) = result
+  -- putStrLn "\n"
+  -- putStrLn . unlines . gridToStrings $ resultGrid
   print . day22aCode $ result
 
 day22a :: Grid -> [Instruction] -> State
@@ -30,12 +30,12 @@ day22a grid =
     startState = (grid, startingPoint grid, right)
 
 day22aCode :: State -> Int
-day22aCode (_, V2 x y, d) = y * 1000 + 4 * x + dirCode d
+day22aCode (_, V2 x y, d) = 1000 * (y + 1) + 4 * (x + 1) + dirCode d
 
 parseInput :: String -> (Grid, [Instruction])
 parseInput text =
   case splitOn [""] . lines $ text of
-    [gridText, instructionsText] -> (gridFromStrings (V2 1 1) gridText, parseInstructions (concat instructionsText))
+    [gridText, instructionsText] -> (gridFromStrings (V2 0 0) gridText, parseInstructions (concat instructionsText))
     _ -> error ("bad input: " ++ text)
 
 data Instruction = TurnLeft | TurnRight | Move Int deriving (Eq, Show)
