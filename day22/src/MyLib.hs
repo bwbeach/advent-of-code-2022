@@ -14,6 +14,7 @@ where
 
 import qualified Data.Map.Strict as M
 import Data.Maybe
+import Debug.Trace
 import Linear.V2 (V2 (..))
 
 -- | A possibly sparse grid of characters.
@@ -112,7 +113,7 @@ gridInsert p@(V2 x y) c g =
 -- explorer being different than the nodes.  It just requires a function,
 -- getValue to get the current node from the explorer's state.
 explore ::
-  Ord k =>
+  (Ord k, Show k, Show v) =>
   (a -> k) -> -- function that extracts the map key from a state
   (a -> v) -> -- function that extracts the map value from a state
   (a -> [a]) -> -- successors of a state: zero or more
@@ -129,4 +130,7 @@ explore getKey getValue getSuccessors start =
     maybeVisit m a =
       if M.member (getKey a) m
         then (m, [])
-        else (M.insert (getKey a) (getValue a) m, getSuccessors a)
+        else (M.insert (getKey a) (traceIt ("MMM " ++ show (getKey a)) (getValue a)) m, getSuccessors a)
+
+traceIt :: Show a => [Char] -> a -> a
+traceIt label x = trace (label ++ " " ++ show x) x
