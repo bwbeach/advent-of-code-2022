@@ -8,6 +8,7 @@ module MyLib
     gridTopLeft,
     pointX,
     pointY,
+    explore,
   )
 where
 
@@ -100,3 +101,32 @@ gridInsert p@(V2 x y) c g =
       gridMinY = min y (gridMinY g),
       gridCells = M.insert p c (gridCells g)
     }
+
+-- | Explores terrain, capturing information about the locations found.
+--
+-- Type "a" is the current state of the explorer, which may include more
+-- information than will be stored in the resulting map.  The current
+-- direction, for example, might not be stored in the map.
+--
+-- Unlike a normal graph traversal, this function supports the state of the
+-- explorer being different than the nodes.  It just requires a function,
+-- getValue to get the current node from the explorer's state.
+explore ::
+  Ord k =>
+  (a -> k) -> -- function that extracts the map key from a state
+  (a -> v) -> -- function that extracts the map value from a state
+  (a -> [a]) -> -- successors of a state: zero or more
+  a -> -- start state
+  M.Map k v -- for all keys found, map from key to value
+explore getKey getValue getSuccessors start =
+  go M.empty [start]
+  where
+    go mapSoFar toVisit =
+      case toVisit of
+        [] -> mapSoFar
+        (v : vs) -> let (m', vs') = maybeVisit mapSoFar v in go m' (vs' ++ vs)
+    -- Visit "a" if we haven't been there before.
+    maybeVisit m a =
+      if M.member (getKey a) m
+        then (m, [])
+        else (M.insert (getKey a) (getValue a) m, getSuccessors a)

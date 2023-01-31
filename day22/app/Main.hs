@@ -5,6 +5,7 @@ import Data.List.Split
 import Data.Maybe
 import Debug.Trace
 import Linear.V2 (V2 (..))
+import Linear.V3 (V3 (..), cross)
 import MyLib
 
 main :: IO ()
@@ -134,3 +135,15 @@ dirCode v = error ("bad direction: " ++ show v)
 
 traceIt :: Show a => [Char] -> a -> a
 traceIt lbl x = trace (lbl ++ " " ++ show x) x
+
+-- | A direction in 3D -- a unit vector.
+type Dir3 = V3 Int
+
+-- | Orientation of the walker in 3D, defined by a forward unit vector, and an "up" unit vector.
+type Orient3 = (Dir3, Dir3)
+
+turnRight3 :: Orient3 -> Orient3
+turnRight3 (f, u) = (f `cross` u, u)
+
+turnLeft3 :: Orient3 -> Orient3
+turnLeft3 (f, u) = (u `cross` f, u)

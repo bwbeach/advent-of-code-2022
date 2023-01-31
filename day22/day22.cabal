@@ -126,4 +126,6 @@ test-suite day22-test
     -- Test dependencies.
     build-depends:
         base ^>=4.16.4.0,
-        day22
+        containers,
+        day22,
+        HUnit
