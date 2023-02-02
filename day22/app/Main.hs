@@ -143,6 +143,12 @@ traceIt lbl x = trace (lbl ++ " " ++ show x) x
 -- | A location in 3D
 type Pos3 = V3 Int
 
+point3X (V3 x _ _) = x
+
+point3Y (V3 _ y _) = y
+
+point3Z (V3 _ _ z) = z
+
 -- | A direction in 3D -- a unit vector.
 type Dir3 = V3 Int
 
@@ -216,8 +222,21 @@ makeCube grid =
 
 cubeToString :: M.Map Pos3 (Char, Dir3) -> String
 cubeToString m =
-  concatMap planeToString [-1 .. 5]
+  concatMap planeToString [minZ .. maxZ]
   where
-    planeToString z = concatMap (rowToString z) [-1 .. 5] ++ "\n"
-    rowToString z y = map (cellToChar z y) [-1 .. 5] ++ "\n"
+    ((minX, maxX), (minY, maxY), (minZ, maxZ)) = cubeBounds m
+    planeToString z = concatMap (rowToString z) [minY .. maxY] ++ "\n"
+    rowToString z y = map (cellToChar z y) [minX .. maxX] ++ "\n"
     cellToChar z y x = maybe ' ' fst (M.lookup (V3 x y z) m)
+
+type MinMax = (Int, Int)
+
+cubeBounds :: M.Map Pos3 a -> (MinMax, MinMax, MinMax)
+cubeBounds m =
+  ( minMax . map point3X . M.keys $ m,
+    minMax . map point3Y . M.keys $ m,
+    minMax . map point3Z . M.keys $ m
+  )
+
+minMax :: [Int] -> MinMax
+minMax ns = (minimum ns, maximum ns)
