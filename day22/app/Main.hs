@@ -60,14 +60,14 @@ parseMove s =
     (ns, rest) = span isDigit s
 
 -- | Find the initial position: the first '.' on the top row
-startingPoint :: Grid -> V2 Int
+startingPoint :: Grid -> Pos
 startingPoint g =
   head . filter isDot . iterate (+ V2 1 0) $ gridTopLeft g
   where
     isDot p = gridLookup p g == Just '.'
 
 -- | As we're moving around, our state is the grid, plus our position and direction.
-type State = (Grid, V2 Int, Dir)
+type State = (Grid, Pos, Dir)
 
 applyInstruction :: State -> Instruction -> State
 applyInstruction s@(grid, pos0, dir0) instr =
@@ -97,6 +97,9 @@ move s@(grid, pos, dir) n =
       if isEmpty p' then p else wrap p' d
       where
         p' = p + turnAround d
+
+-- | A location on the grid
+type Pos = V2 Int
 
 -- | A direction is represented as a unit vector
 type Dir = V2 Int
@@ -172,7 +175,7 @@ turnLeft3 (f, u) = (u `cross` f, u)
 -- adjacent face.  The explorer gets full coverage by trying going right,
 -- straight, and left from every position, with the "explore" function ignoring
 -- duplicate positions found.
-makeCube :: Grid -> M.Map Pos3 (Char, Dir3)
+makeCube :: Grid -> M.Map Pos3 (Char, Pos, Dir3)
 makeCube grid =
   -- The state of the explorer is a tuple containing:
   --  - current 2d position on original grid
@@ -196,7 +199,7 @@ makeCube grid =
     -- the key for the output map is the 3D position of the explorer
     getKey (_, _, p3, _, _) = p3
     -- the information stored in the output map is the char from the grid, and the direction of grid "up"
-    getValue (p2, _, _, _, u3) = (fromJust $ gridLookup p2 grid, u3)
+    getValue (p2, _, _, _, u3) = (fromJust $ gridLookup p2 grid, p2, u3)
     -- what are the adjacent places the explorer can get to by going straight one unit,
     -- turning left and going one unit, or turning right and going one unit?
     getSuccessors (p2, d2, p3, o3, gu3) =
@@ -229,14 +232,15 @@ intSqrt 16 = 4
 intSqrt 2500 = 50
 intSqrt n = error ("intSqrt not implemented for: " ++ show n)
 
-cubeToString :: M.Map Pos3 (Char, Dir3) -> String
+cubeToString :: M.Map Pos3 (Char, Pos, Dir3) -> String
 cubeToString m =
   concatMap planeToString [minZ .. maxZ]
   where
     ((minX, maxX), (minY, maxY), (minZ, maxZ)) = cubeBounds m
     planeToString z = concatMap (rowToString z) [minY .. maxY] ++ "\n"
     rowToString z y = map (cellToChar z y) [minX .. maxX] ++ "\n"
-    cellToChar z y x = maybe ' ' fst (M.lookup (V3 x y z) m)
+    cellToChar z y x = maybe ' ' valueToChar (M.lookup (V3 x y z) m)
+    valueToChar (c, _, _) = c
 
 type MinMax = (Int, Int)
 
