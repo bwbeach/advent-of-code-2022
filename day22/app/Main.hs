@@ -13,8 +13,7 @@ import MyLib
 main :: IO ()
 main = do
   runWithFile "test.txt"
-
--- runWithFile "input.txt"
+  runWithFile "input.txt"
 
 runWithFile :: String -> IO ()
 runWithFile fileName = do
@@ -183,6 +182,9 @@ makeCube grid =
   --  - current 3d direction of "up" on the grid
   explore getKey getValue getSuccessors start
   where
+    -- how big is each face?
+    -- there are six faces, each of which is a square
+    faceSize = intSqrt (gridPointCount grid `div` 6)
     -- starting point on the input grid
     start2d = startingPoint grid
     -- starting point on the output cube
@@ -213,12 +215,19 @@ makeCube grid =
         then (p2 + d2, d2, p3 + f3, o3, u3)
         else (p2 + d2, d2, p3 + f3 - u3, pitchForward o3, rotate gu3 (f3 `cross` u3))
     -- Are the two 2d points on the same cube face?
-    oneSameFace (V2 x1 y1) (V2 x2 y2) = (x1 `div` 4 == x2 `div` 4) && (y1 `div` 4 == y2 `div` 4)
+    oneSameFace (V2 x1 y1) (V2 x2 y2) =
+      (x1 `div` faceSize == x2 `div` faceSize)
+        && (y1 `div` faceSize == y2 `div` faceSize)
     -- Rotate a 3d orientation by pitching forward 90 degrees
     pitchForward (f, u) = (negate u, f)
     -- Rotate "a" 90 degrees clockwise around "b"
     rotate :: V3 Int -> V3 Int -> V3 Int
     rotate a b = (a `cross` b) + fmap (* (a `dot` b)) b
+
+intSqrt :: Int -> Int
+intSqrt 16 = 4
+intSqrt 2500 = 50
+intSqrt n = error ("intSqrt not implemented for: " ++ show n)
 
 cubeToString :: M.Map Pos3 (Char, Dir3) -> String
 cubeToString m =

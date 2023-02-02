@@ -6,6 +6,7 @@ module MyLib
     gridLookup,
     gridInsert,
     gridTopLeft,
+    gridPointCount,
     pointX,
     pointY,
     explore,
@@ -103,6 +104,9 @@ gridInsert p@(V2 x y) c g =
       gridCells = M.insert p c (gridCells g)
     }
 
+gridPointCount :: Grid -> Int
+gridPointCount = M.size . gridCells
+
 -- | Explores terrain, capturing information about the locations found.
 --
 -- Type "a" is the current state of the explorer, which may include more
@@ -130,7 +134,7 @@ explore getKey getValue getSuccessors start =
     maybeVisit m a =
       if M.member (getKey a) m
         then (m, [])
-        else (M.insert (getKey a) (traceIt ("MMM " ++ show (getKey a)) (getValue a)) m, getSuccessors a)
+        else (M.insert (getKey a) (getValue a) m, getSuccessors a)
 
 traceIt :: Show a => [Char] -> a -> a
 traceIt label x = trace (label ++ " " ++ show x) x
