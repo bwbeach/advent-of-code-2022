@@ -21,20 +21,47 @@ runWithFile fileName = do
   text <- readFile fileName
   let (grid, instructions) = parseInput text
   let result = day22a grid instructions
-  -- let (resultGrid, _, _) = result
-  -- putStrLn "\n"
-  -- putStrLn . unlines . gridToStrings $ resultGrid
-  print . day22aCode $ result
-  putStrLn . cubeToString . makeCube $ grid
+  print . day22Code $ result
+
+-- putStrLn . cubeToString . makeCube $ grid
 
 day22a :: Grid -> [Instruction] -> State
 day22a grid =
   foldl applyInstruction startState
   where
-    startState = (grid, startingPoint grid, right)
+    startState = (startingPoint grid, right)
 
-day22aCode :: State -> Int
-day22aCode (_, V2 x y, d) = 1000 * (y + 1) + 4 * (x + 1) + dirCode d
+    applyInstruction :: State -> Instruction -> State
+    applyInstruction s@(pos0, dir0) instr =
+      case instr of
+        TurnLeft -> (pos0, turnLeft dir0)
+        TurnRight -> (pos0, turnRight dir0)
+        Move n -> move s n
+
+    -- \| Move n positions form where we are in the direction we're facing, or until hitting a wall.
+    move :: State -> Int -> State
+    move s 0 = s
+    move s@(pos, dir) n =
+      case look nextPos of
+        Nothing -> error "should have wrapped"
+        Just '#' -> s
+        Just _ -> move (nextPos, dir) (n - 1)
+      where
+        candidatePos = pos + dir
+        needToWrap = isEmpty candidatePos
+        nextPos = if needToWrap then wrap pos dir else candidatePos
+        isEmpty p = isNothing $ look p
+        look p = gridLookup p grid
+        -- wrap around from a spot that is non-empty.  the problem description says
+        -- to "look in the opposite direction" until finding the edge of the board
+        wrap p d =
+          if isEmpty p' then p else wrap p' d
+          where
+            p' = p + turnAround d
+
+-- | The code that is the answer, derived from the ending position and direction.
+day22Code :: State -> Int
+day22Code (V2 x y, d) = 1000 * (y + 1) + 4 * (x + 1) + dirCode d
 
 parseInput :: String -> (Grid, [Instruction])
 parseInput text =
@@ -67,36 +94,7 @@ startingPoint g =
     isDot p = gridLookup p g == Just '.'
 
 -- | As we're moving around, our state is the grid, plus our position and direction.
-type State = (Grid, Pos, Dir)
-
-applyInstruction :: State -> Instruction -> State
-applyInstruction s@(grid, pos0, dir0) instr =
-  case instr of
-    TurnLeft -> (grid, pos0, turnLeft dir0)
-    TurnRight -> (grid, pos0, turnRight dir0)
-    Move n -> move s n
-
--- | Move n positions form where we are in the direction we're facing, or until hitting a wall.
-move :: State -> Int -> State
-move s 0 = s
-move s@(grid, pos, dir) n =
-  case look nextPos of
-    Nothing -> error "should have wrapped"
-    Just '#' -> s
-    Just _ -> move (markedGrid, nextPos, dir) (n - 1)
-  where
-    candidatePos = pos + dir
-    needToWrap = isEmpty candidatePos
-    nextPos = if needToWrap then wrap pos dir else candidatePos
-    markedGrid = gridInsert pos (dirChar dir) grid
-    isEmpty p = isNothing $ look p
-    look p = gridLookup p grid
-    -- wrap around from a spot that is non-empty.  the problem description says
-    -- to "look in the opposite direction" until finding the edge of the board
-    wrap p d =
-      if isEmpty p' then p else wrap p' d
-      where
-        p' = p + turnAround d
+type State = (Pos, Dir)
 
 -- | A location on the grid
 type Pos = V2 Int
