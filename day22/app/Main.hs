@@ -13,8 +13,7 @@ import MyLib
 main :: IO ()
 main = do
   runWithFile "test.txt"
-
--- runWithFile "input.txt"
+  runWithFile "input.txt"
 
 runWithFile :: String -> IO ()
 runWithFile fileName = do
@@ -43,32 +42,25 @@ type State = (Pos, Dir)
 -- pairs from the starting location to the end.
 day22a :: Grid -> [Instruction] -> [State]
 day22a grid instructions =
-  startState : applyInstructions startState instructions
+  scanl applyInstruction startState (compileInstructions instructions)
   where
     startState = (startingPoint grid, right)
 
-    applyInstructions :: State -> [Instruction] -> [State]
-    applyInstructions _ [] = []
-    applyInstructions s (i : is) =
-      first ++ applyInstructions (last (s : first)) is
-      where
-        first = applyInstruction s i
-
-    applyInstruction :: State -> Instruction -> [State]
+    applyInstruction :: State -> Instruction -> State
     applyInstruction s@(pos0, dir0) instr =
       case instr of
-        TurnLeft -> [(pos0, turnLeft dir0)]
-        TurnRight -> [(pos0, turnRight dir0)]
-        Move n -> move s n
+        TurnLeft -> (pos0, turnLeft dir0)
+        TurnRight -> (pos0, turnRight dir0)
+        Move 1 -> moveOne s
+        _ -> error ("bad single instruction: " ++ show instr)
 
-    -- \| Move n positions form where we are in the direction we're facing, or until hitting a wall.
-    move :: State -> Int -> [State]
-    move _ 0 = []
-    move (pos, dir) n =
+    -- \| Move one position form where we are in the direction we're facing, if there is no wall in the way.
+    moveOne :: State -> State
+    moveOne (pos, dir) =
       case look nextPos of
         Nothing -> error "should have wrapped"
-        Just '#' -> []
-        Just _ -> (nextPos, dir) : move (nextPos, dir) (n - 1)
+        Just '#' -> (pos, dir)
+        Just _ -> (nextPos, dir)
       where
         candidatePos = pos + dir
         needToWrap = isEmpty candidatePos
@@ -81,6 +73,16 @@ day22a grid instructions =
           if isEmpty p' then p else wrap p' d
           where
             p' = p + turnAround d
+
+-- | Translates an instruction into a sequence of single steps.
+--
+-- In the result, every move instructions is (Move 1)
+compileInstructions :: [Instruction] -> [Instruction]
+compileInstructions =
+  concatMap compileOne
+  where
+    compileOne (Move n) = replicate n (Move 1)
+    compileOne i = [i]
 
 -- | The code that is the answer, derived from the ending position and direction.
 day22Code :: State -> Int
