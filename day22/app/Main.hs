@@ -13,7 +13,8 @@ import MyLib
 main :: IO ()
 main = do
   runWithFile "test.txt"
-  runWithFile "input.txt"
+
+-- runWithFile "input.txt"
 
 runWithFile :: String -> IO ()
 runWithFile fileName = do
@@ -21,13 +22,28 @@ runWithFile fileName = do
   text <- readFile fileName
   let (grid, instructions) = parseInput text
   let result = day22a grid instructions
-  print . day22Code $ result
+  putStrLn . unlines . gridToStrings $ markGrid grid result
+  print . day22Code . last $ result
 
 -- putStrLn . cubeToString . makeCube $ grid
 
-day22a :: Grid -> [Instruction] -> State
-day22a grid =
-  foldl applyInstruction startState
+-- | Mark positions and directions on the grid
+markGrid :: Foldable t => Grid -> t (V2 Int, Dir) -> Grid
+markGrid =
+  foldl markOne
+  where
+    markOne g (p, d) = gridInsert p (dirChar d) g
+
+-- | As we're moving around, our state is position and direction.
+type State = (Pos, Dir)
+
+-- | Given the input grid, and a sequence of instructions, return a sequence of States.
+--
+-- Each state is a position and direction.  The returned list is all of the (pos, dir)
+-- pairs from the starting location to the end.
+day22a :: Grid -> [Instruction] -> [State]
+day22a grid instructions =
+  startState : scanl applyInstruction startState instructions
   where
     startState = (startingPoint grid, right)
 
@@ -92,9 +108,6 @@ startingPoint g =
   head . filter isDot . iterate (+ V2 1 0) $ gridTopLeft g
   where
     isDot p = gridLookup p g == Just '.'
-
--- | As we're moving around, our state is the grid, plus our position and direction.
-type State = (Pos, Dir)
 
 -- | A location on the grid
 type Pos = V2 Int
