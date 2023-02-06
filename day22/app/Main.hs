@@ -43,25 +43,32 @@ type State = (Pos, Dir)
 -- pairs from the starting location to the end.
 day22a :: Grid -> [Instruction] -> [State]
 day22a grid instructions =
-  startState : scanl applyInstruction startState instructions
+  startState : applyInstructions startState instructions
   where
     startState = (startingPoint grid, right)
 
-    applyInstruction :: State -> Instruction -> State
+    applyInstructions :: State -> [Instruction] -> [State]
+    applyInstructions _ [] = []
+    applyInstructions s (i : is) =
+      first ++ applyInstructions (last (s : first)) is
+      where
+        first = applyInstruction s i
+
+    applyInstruction :: State -> Instruction -> [State]
     applyInstruction s@(pos0, dir0) instr =
       case instr of
-        TurnLeft -> (pos0, turnLeft dir0)
-        TurnRight -> (pos0, turnRight dir0)
+        TurnLeft -> [(pos0, turnLeft dir0)]
+        TurnRight -> [(pos0, turnRight dir0)]
         Move n -> move s n
 
     -- \| Move n positions form where we are in the direction we're facing, or until hitting a wall.
-    move :: State -> Int -> State
-    move s 0 = s
-    move s@(pos, dir) n =
+    move :: State -> Int -> [State]
+    move _ 0 = []
+    move (pos, dir) n =
       case look nextPos of
         Nothing -> error "should have wrapped"
-        Just '#' -> s
-        Just _ -> move (nextPos, dir) (n - 1)
+        Just '#' -> []
+        Just _ -> (nextPos, dir) : move (nextPos, dir) (n - 1)
       where
         candidatePos = pos + dir
         needToWrap = isEmpty candidatePos
