@@ -1,14 +1,22 @@
 module Main (main) where
 
-import Data.Char
-import Data.List.Split
+import Data.Char (isDigit)
+import Data.List.Split (splitOn)
 import qualified Data.Map.Strict as M
-import Data.Maybe
-import Debug.Trace
-import Linear.Metric
+import Data.Maybe (fromJust, isJust, isNothing)
+import Linear.Metric (Metric (dot))
 import Linear.V2 (V2 (..))
 import Linear.V3 (V3 (..), cross)
 import MyLib
+  ( Grid,
+    explore,
+    gridFromStrings,
+    gridInsert,
+    gridLookup,
+    gridPointCount,
+    gridToStrings,
+    gridTopLeft,
+  )
 
 main :: IO ()
 main = do
@@ -21,8 +29,11 @@ runWithFile fileName = do
   text <- readFile fileName
   let (grid, instructions) = parseInput text
   let result = day22a grid instructions
-  putStrLn . unlines . gridToStrings $ markGrid grid result
+  -- putStrLn . unlines . gridToStrings $ markGrid grid result
   print . day22Code . last $ result
+  let resultB = day22b grid instructions
+  -- putStrLn . unlines . gridToStrings $ markGrid grid resultB
+  print . day22Code . last $ resultB
 
 -- putStrLn . cubeToString . makeCube $ grid
 
@@ -46,7 +57,6 @@ day22a grid instructions =
   where
     startState = (startingPoint grid, right)
 
-    applyInstruction :: State -> Instruction -> State
     applyInstruction s@(pos0, dir0) instr =
       case instr of
         TurnLeft -> (pos0, turnLeft dir0)
@@ -73,6 +83,81 @@ day22a grid instructions =
           if isEmpty p' then p else wrap p' d
           where
             p' = p + turnAround d
+
+-- | State of walking around on the cube
+type State3 = (Pos3, Orient3)
+
+-- | Given the input grid, and a sequence of instructions, return a sequence of States.
+--
+-- Each state is a position and direction.  The returned list is all of the (pos, dir)
+-- pairs from the starting location to the end.
+--
+-- This is like day22a, but the movement is done on the cube, not on the flat grid.
+--
+-- The state we track is the position and orientation on the grid: (Pos3, Orient3)
+day22b :: Grid -> [Instruction] -> [State]
+day22b grid instructions =
+  map flattenState $ scanl applyInstruction start (compileInstructions instructions)
+  where
+    -- We need a cube to walk around on
+    cube = makeCube grid
+
+    -- We start at the origin, facing right, standing up
+    start = (V3 0 0 0, (V3 1 0 0, V3 0 0 (-1)))
+
+    -- Apply one instruction by moving on the cube
+    applyInstruction :: State3 -> Instruction -> State3
+    applyInstruction s@(pos0, orient0) instr =
+      case instr of
+        TurnLeft -> (pos0, turnLeft3 orient0)
+        TurnRight -> (pos0, turnRight3 orient0)
+        Move 1 -> moveOneMaybe s
+        _ -> error ("bad single instruction: " ++ show instr)
+
+    -- Move forward one unit, if that doesn't land on a '#'
+    moveOneMaybe s =
+      if isRock s'
+        then s
+        else s'
+      where
+        s' = moveOne s
+
+    -- Check whether the cube at the given location is rock
+    isRock (p, _) =
+      c == '#'
+      where
+        (c, _, _) = fromJust (M.lookup p cube)
+
+    -- Move forward one unit, possibly wrapping to another face
+    moveOne :: State3 -> State3
+    moveOne (pos0, (f0, u0)) =
+      if M.member pos1 cube
+        then (pos1, (f0, u0))
+        else (pos2, (f2, u2))
+      where
+        -- position after moving forward one
+        pos1 = pos0 + f0
+        -- orientation after tipping forward 90 degrees
+        (f2, u2) = (negate u0, f0)
+        -- position after moving forward one, tipping forward, then moving forward again
+        pos2 = pos1 + f2
+
+    -- Turn a 3D state into a 2D state
+    flattenState :: State3 -> State
+    flattenState (pos, orient) =
+      (p, d)
+      where
+        (_, p, gridUp) = fromJust $ M.lookup pos cube
+        d = orientToDir orient gridUp
+
+-- | Convert an orientation on the cube to a direction on the original grid
+orientToDir :: Orient3 -> Dir3 -> Dir
+orientToDir (f, u) gridUp
+  | f == gridUp = up
+  | f == negate gridUp = down
+  | f `cross` u == gridUp = left
+  | u `cross` f == gridUp = right
+  | otherwise = error ("orientToDir failed: " ++ show f ++ " " ++ show u ++ " " ++ show gridUp)
 
 -- | Translates an instruction into a sequence of single steps.
 --
@@ -159,9 +244,6 @@ dirCode (V2 0 (-1)) = 3
 dirCode (V2 0 1) = 1
 dirCode v = error ("bad direction: " ++ show v)
 
-traceIt :: Show a => [Char] -> a -> a
-traceIt lbl x = trace (lbl ++ " " ++ show x) x
-
 -- | A location in 3D
 type Pos3 = V3 Int
 
@@ -185,9 +267,10 @@ turnLeft3 (f, u) = (u `cross` f, u)
 
 -- | Transform the grid into a 3D cube, represented as a map from 3D position to info.
 --
--- The info for each position on each face is (c, up) where c is the character
--- from the original grid, and up is the vector pointing in the direction of up
--- on the original grid, rotated to match the orientation of the face.
+-- The info for each position on each face is (c, pos, up) where c is the character
+-- from the original grid, pos is the position on the original grid, and up is the
+-- vector pointing in the direction of up on the original grid, rotated to match the
+-- orientation of the face.
 --
 -- Works by simulating walking around the grid with the "explore" function,
 -- while also tracking a position/orientation in 3D.  When walking off the
@@ -235,7 +318,7 @@ makeCube grid =
     -- an adjacent face.
     moveOne (p2, d2, p3, o3@(f3, u3), gu3) =
       if oneSameFace p2 (p2 + d2)
-        then (p2 + d2, d2, p3 + f3, o3, u3)
+        then (p2 + d2, d2, p3 + f3, o3, gu3)
         else (p2 + d2, d2, p3 + f3 - u3, pitchForward o3, rotate gu3 (f3 `cross` u3))
     -- Are the two 2d points on the same cube face?
     oneSameFace (V2 x1 y1) (V2 x2 y2) =
