@@ -1,7 +1,9 @@
 module Main (main) where
 
+import Data.Function ((&))
+import Data.List (findIndex)
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
+import Data.Maybe (catMaybes, fromJust, fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Set as S
 import Linear.V2 (V2 (..))
 import MyLib ()
@@ -19,11 +21,33 @@ runWithFile fileName = do
   let (grid', _) = oneRound (grid, initialSearchOrder)
   putStrLn . formatGrid $ grid
   putStrLn . formatGrid $ grid'
-  let (grid'', _) = applyNTimes 10 oneRound (grid, initialSearchOrder)
-  print . emptyTiles $ grid''
+  print . part1 $ grid
+  print . part2 $ grid
+
+part1 :: S.Set Pos -> Int
+part1 grid =
+  (grid, initialSearchOrder)
+    & applyNTimes 10 oneRound
+    & fst
+    & emptyTiles
 
 applyNTimes :: Int -> (a -> a) -> a -> a
 applyNTimes n f x = iterate f x !! n
+
+part2 :: S.Set Pos -> Int
+part2 grid =
+  (grid, initialSearchOrder)
+    & iterate oneRound
+    & map fst
+    & pairs
+    & findIndex (uncurry (==))
+    & fromJust
+    & (1 +)
+
+pairs :: [a] -> [(a, a)]
+pairs [] = []
+pairs [_] = []
+pairs (a : b : cs) = (a, b) : pairs (b : cs)
 
 emptyTiles :: S.Set (V2 Int) -> Int
 emptyTiles grid = gridSize grid - S.size grid
