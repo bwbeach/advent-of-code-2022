@@ -1,55 +1,153 @@
-module Main where
+{-
+    Advent of Code 2022, Day 24
+-}
 
-import Algorithm.Search (aStar)
+module Main (main) where
+
+import Algorithm.Search (dijkstra)
 import qualified Data.Map.Strict as M
-import Data.Maybe (fromJust, fromMaybe)
+import Data.Maybe
 import qualified Data.Set as S
 import Linear (V2 (..))
-
-main :: IO ()
-main = do
-  runWithFile "test.txt"
-
-runWithFile :: String -> IO ()
-runWithFile fileName = do
-  input <- readFile fileName
-  let problem = parseInput input
-  let steps = part1 problem
-  putStrLn $ formatSequence steps
-  print (length steps)
-  putStrLn ""
-
-formatSequence :: [Problem] -> [Char]
-formatSequence steps =
-  concat $ zipWith formatOne [1 ..] steps
-  where
-    formatOne :: Int -> Problem -> String
-    formatOne i p = show i ++ ":\n" ++ formatProblem p ++ "\n"
-
-part1 :: Problem -> [Problem]
-part1 problem =
-  states
-  where
-    (_, states) = fromJust $ aStar successors transitionCost remainingCost isSolution problem
 
 -- | A position is a (V2 x y)
 type Pos = V2 Int
 
--- | A direction of movement is a vector
+-- | A direction of movement is a vector (V2 dx dy)
 type Dir = V2 Int
 
--- | The input problem is (expeditionPosition, width, height, blizzards)
-type Problem = (Pos, Int, Int, [Blizzard])
+-- | The input problem is (width, height, blizzards)
+type Input = (Int, Int, [Blizzard])
 
 -- | Each blizzard has a position and a direction
 type Blizzard = (Pos, Dir)
 
--- | Convert input text into a Problem
-parseInput :: String -> Problem
-parseInput text =
-  (initialPos, width, height, blizzards)
+-- | After pre-processing the input. the blizzards are a "loop".
+--
+-- The positions of the blizzards repeats within at most (width - 2) * (height - 2) steps.
+-- The pre-processing builds a "loop" that is a map from index to a set of blizzard
+-- positions.  The blizzards nolonger have directions, because after pre-processing
+-- we don't need the directions any more; we just need to know where the blizzards are at each time.
+type BlizzardLoop = M.Map Int (S.Set Pos)
+
+-- | After pre-processing, the problem is (width, height, blizzardLoop)
+type Problem = (Int, Int, BlizzardLoop)
+
+main :: IO ()
+main = do
+  showStepsWithFile "test.txt"
+  runWithFile "test.txt"
+  runWithFile "input.txt"
+
+-- | For testing, show the sequence of steps on the test problem.
+showStepsWithFile :: String -> IO ()
+showStepsWithFile fileName =
+  do
+    input <- readFile fileName
+    let problem@(w, h, _) = parseProblem input
+    putStrLn . concatMap (showStep problem) $ findPath problem (V2 1 0, 0) (V2 (w - 2) (h - 1))
+
+-- | Format the grid at a given position/time.
+showStep :: Problem -> (Pos, Int) -> [Char]
+showStep (width, height, blizzardLoop) (p, t) =
+  show t ++ ":\n" ++ unlines (map showLine [0 .. height - 1]) ++ "\n"
   where
-    initialPos = V2 1 0
+    showLine y = map (showCell y) [0 .. width - 1]
+
+    showCell y x
+      | V2 x y == p = 'E'
+      | x == 0 = '#'
+      | x == width - 1 = '#'
+      | y == 0 = if x == 1 then '.' else '#'
+      | y == height - 1 = if x == width - 2 then '.' else '#'
+      | otherwise = if isBlizzard (V2 x y) then '*' else '.'
+
+    isBlizzard p' = S.member p' blizzardPositions
+
+    blizzardPositions = fromJust (M.lookup loopIndex blizzardLoop)
+
+    loopIndex = t `mod` M.size blizzardLoop
+
+-- | Run parts 1 and 2 on the given file
+runWithFile :: String -> IO ()
+runWithFile fileName = do
+  putStrLn fileName
+  input <- readFile fileName
+  let problem = parseProblem input
+  print $ part1 problem
+  print $ part2 problem
+
+part1 :: Problem -> Int
+part1 problem@(width, height, _) =
+  length $ findPath problem (V2 1 0, 0) (V2 (width - 2) (height - 1))
+
+part2 :: Problem -> Int
+part2 problem@(width, height, _) =
+  snd $ foldl lastOfPath initial [target, start, target]
+  where
+    start = V2 1 0
+    target = V2 (width - 2) (height - 1)
+    initial = (start, 0)
+    lastOfPath from to = last $ findPath problem from to
+
+-- | Given a Problem, find the shortest path from an initial (position, time) to the target position.
+findPath :: Problem -> (Pos, Int) -> Pos -> [(Pos, Int)]
+findPath (width, height, blizzardLoop) initial target =
+  path
+  where
+    (_, path) = fromJust $ dijkstra neighbors transCost isGoal initial
+
+    -- the length of the loop
+    loopLength = M.size blizzardLoop
+
+    -- where the expedition can go next
+    neighbors (p, t) =
+      [ (p', t')
+        | d <- moveChoices,
+          let p' = p + d,
+          isOnBoard p',
+          not (S.member p' blizzardPositions)
+      ]
+      where
+        t' = t + 1
+        li' = t' `mod` loopLength
+        blizzardPositions = fromJust $ M.lookup li' blizzardLoop
+
+    -- The five choices are to stay put, or move in one of the four directions
+    moveChoices =
+      [ V2 0 0,
+        V2 1 0,
+        V2 (-1) 0,
+        V2 0 1,
+        V2 0 (-1)
+      ]
+
+    -- All moves have the same cost
+    transCost _ _ = 1 :: Int
+
+    -- Is a state the goal?
+    isGoal (p, _) = p == target
+
+    -- Is this location on the board?
+    isOnBoard (V2 x y) =
+      0 < x
+        && x < width - 1
+        && (0 < y || (y == 0 && x == 1))
+        && (y < height - 1 || (y == height - 1 && x == width - 2))
+
+-- | Parse input, and preprocess the blizzards
+parseProblem :: String -> Problem
+parseProblem text =
+  (w, h, loop)
+  where
+    (w, h, blizzards) = parseInput text
+    loop = makeBlizzardLoop w h blizzards
+
+-- | Convert input text into an Input
+parseInput :: String -> Input
+parseInput text =
+  (width, height, blizzards)
+  where
     rows = lines text
     width = length . head $ rows
     height = length rows
@@ -70,145 +168,39 @@ parseInput text =
       | c == 'v' = V2 0 1
       | otherwise = error ("bad blizzard char: " ++ [c])
 
--- | Move all blizzards one step
-moveBlizzards :: Problem -> Problem
-moveBlizzards (pos, width, height, blizzards) =
-  (pos, width, height, map moveBlizzard blizzards)
+-- | Start with initial blizzards, and generate the loop of sets of positions
+--
+-- The pattern of blizzards will repeat.  Detection of the repeats requires matching
+-- direction as well as position.  But once you have the loop, each set of blizzards
+-- can be reduced to just a position; it doesn't matter if there are multiple blizzards
+-- at the same position.
+--
+-- The result is a map from zero-based index into the loop to a set of positions
+-- where there are blizzards.
+makeBlizzardLoop :: Int -> Int -> [Blizzard] -> BlizzardLoop
+makeBlizzardLoop width height initialBlizzards =
+  M.fromList . zip [0 ..] . map blizzardToPosSet $ blizzardLoop
   where
-    moveBlizzard (p, d) = (wrapPos (p + d), d)
+    -- Return the list of blizzards just until it repeats.
+    blizzardLoop = takeUntilRepeat (iterate moveAll initialBlizzards)
+
+    -- Move all of the blizzards one step, wrapping at edges.
+    moveAll = map moveOne
+
+    -- Move one blizzard one step
+    moveOne (p, d) = (wrapPos (p + d), d)
+
+    -- Wrap a position if it's gone past the edge
     wrapPos (V2 x y) = V2 (wrap x width) (wrap y height)
     wrap n limit
       | n == 0 = limit - 2
       | n == limit - 1 = 1
       | otherwise = n
 
--- | Find all of the places the expedition could move
---
--- Assumes that blizzards have already moved, and can be used to see if a
--- new location is OK.
-nextLocations :: Problem -> [Pos]
-nextLocations (pos, width, height, blizzards) =
-  filter isOk candidates
-  where
-    -- The possible destinations
-    candidates = map (+ pos) moveChoices
+    -- Convert a blizzard to a set of positions.
+    blizzardToPosSet = S.fromList . map fst
 
-    -- The five choices are to stay put, or move in one of the four directions
-    moveChoices =
-      [ V2 0 0,
-        V2 1 0,
-        V2 (-1) 0,
-        V2 0 1,
-        V2 0 (-1)
-      ]
-
-    -- Is this place OK to move to?
-    isOk p = isOnBoard p && (not . isBlizzard) p
-
-    -- Is this location on the board?
-    isOnBoard (V2 x y) =
-      0 < x
-        && x < width - 1
-        && (0 < y || (y == 0 && x == 1))
-        && (y < height - 1 || (y == height - 1 && x == width - 2))
-
-    -- Is there a blizzard at this location?
-    isBlizzard p = p `elem` map fst blizzards
-
--- | Successors to a problem when searching
-successors :: Problem -> [Problem]
-successors problem =
-  [ (nextPos, width, height, blizzards)
-    | let (_, width, height, blizzards) = movedBlizzards,
-      nextPos <- nextLocations movedBlizzards
-  ]
-  where
-    movedBlizzards = moveBlizzards problem
-
--- | Cost to go from one state to another
---
--- Every move has the same cost.
-transitionCost :: Problem -> Problem -> Int
-transitionCost _ _ = 1
-
--- | Our estimate of the remaining cost from a position is the manhattan distance to the goal
-remainingCost :: Problem -> Int
-remainingCost p = manhattan (problemPosition p) (goalPosition p)
-
--- | Is this state a solution to the search
-isSolution :: Problem -> Bool
-isSolution p =
-  problemPosition p == goalPosition p
-
--- | The current position of the expedition in a Problem
-problemPosition :: Problem -> Pos
-problemPosition (p, _, _, _) = p
-
--- | For a given problem, where are we trying to get to?
-goalPosition :: Problem -> Pos
-goalPosition (_, width, height, _) = V2 (width - 2) (height - 1)
-
--- | Manhattan distance between two positions
-manhattan :: Pos -> Pos -> Int
-manhattan (V2 x0 y0) (V2 x1 y1) = abs (x0 - x1) + abs (y0 - y1)
-
--- | Formats a state, so we can print it for testing
-formatProblem :: Problem -> String
-formatProblem problem@(pos, width, height, blizzards) =
-  unlines rows
-  where
-    rows = map formatRow [0 .. height - 1]
-
-    formatRow y = map (formatCell y) [0 .. width - 1]
-
-    formatCell y x
-      | V2 x y == pos = 'E'
-      | isBorder x y = '#'
-      | M.member (V2 x y) posToBlizzards = formatBlizzard (V2 x y)
-      | otherwise = '.'
-
-    formatBlizzard p =
-      if S.size directions == 1
-        then blizzardDirectionChar (head . S.toList $ directions)
-        else head . show . S.size $ directions
-      where
-        directions = fromJust . M.lookup p $ posToBlizzards
-
-    blizzardDirectionChar d =
-      case d of
-        V2 0 1 -> 'v'
-        V2 0 (-1) -> '^'
-        V2 1 0 -> '>'
-        V2 (-1) 0 -> '<'
-        _ -> error ("bad direction: " ++ show d)
-
-    isBorder x y =
-      (x == 0 || x == width - 1 || y == 0 || y == height - 1)
-        && (V2 x y /= V2 1 0)
-        && (V2 x y /= goal)
-
-    goal = goalPosition problem
-
-    -- map from position to the directions of blizzards there
-    posToBlizzards = mapToSets blizzards
-
--- | Build a map whose values are sets.
-mapToSets :: (Ord k, Ord v) => [(k, v)] -> M.Map k (S.Set v)
-mapToSets =
-  foldl addOne M.empty
-  where
-    addOne m (k, v) = updateMap S.empty k (S.insert v) m
-
--- | Update the value stored in a map.
-updateMap ::
-  Ord k =>
-  v -> -- default value
-  k -> -- key whose value will be updated
-  (v -> v) -> -- function to update the value
-  M.Map k v -> -- original map
-  M.Map k v -- updated map
-updateMap d k f m =
-  M.insert k newValue m
-  where
-    oldValue = fromMaybe d (M.lookup k m)
-    newValue = f oldValue
+-- | Given a list where the first element repeats, return everything up to (not icluding) the first repeat
+takeUntilRepeat :: Eq a => [a] -> [a]
+takeUntilRepeat [] = []
+takeUntilRepeat (x : xs) = x : takeWhile (/= x) xs
