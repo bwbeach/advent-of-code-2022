@@ -1,12 +1,35 @@
 {-
     Advent of Code 2022, Day 24
+
+    My first attempt used aStar search (a best-first search), where the
+    next possible states were computed by moving all of the blizzards, and
+    seeing which of the five possible next locations didn't collide with
+    a blizzard or a wall.  That worked fine for the sample problem, but
+    ran out of memory on the real problem.  Also, recomputing the next states
+    of the blizzards on each move was a lot of repeated computation.
+
+    I made two observations to improve the second attempt:
+
+    (1) The blizzards repeat in a not-too-long period.  You can precompute
+        a list of blizzard states and loop through it as the search progresses.
+
+    (2) The product of all of the blizzard states and all of the possible
+        positions of the expedition is small enough to fit in memory.  So treating
+        the problem as a shortest-path graph problem can eliminate duplicate
+        search states.  The graph nodes are named with (position, blizzard index),
+        and with a graph search, if the same node is encountered again, it will
+        net be searched again.
+
+    The length of the blizzard repeat loop in the real problem is 700.  The number
+    of possible positions of the expedition is 3500.  The total number of nodes in
+    the complete graph being search is 2,450,000.
 -}
 
 module Main (main) where
 
 import Algorithm.Search (dijkstra)
 import qualified Data.Map.Strict as M
-import Data.Maybe
+import Data.Maybe (fromJust)
 import qualified Data.Set as S
 import Linear (V2 (..))
 
@@ -19,15 +42,15 @@ type Dir = V2 Int
 -- | The input problem is (width, height, blizzards)
 type Input = (Int, Int, [Blizzard])
 
--- | Each blizzard has a position and a direction
+-- | Each blizzard in the input has a position and a direction
 type Blizzard = (Pos, Dir)
 
 -- | After pre-processing the input. the blizzards are a "loop".
 --
--- The positions of the blizzards repeats within at most (width - 2) * (height - 2) steps.
--- The pre-processing builds a "loop" that is a map from index to a set of blizzard
--- positions.  The blizzards nolonger have directions, because after pre-processing
--- we don't need the directions any more; we just need to know where the blizzards are at each time.
+-- For quick access to numbered entries, it's stored as a map from index-in-loop
+-- to the set of positions where blizzards are.  After preprocessing, we no longer
+-- need directions for blizzards; we just need to know where they are when checking
+-- if the expedition can occupy a position.
 type BlizzardLoop = M.Map Int (S.Set Pos)
 
 -- | After pre-processing, the problem is (width, height, blizzardLoop)
@@ -79,18 +102,29 @@ runWithFile fileName = do
 
 part1 :: Problem -> Int
 part1 problem@(width, height, _) =
-  length $ findPath problem (V2 1 0, 0) (V2 (width - 2) (height - 1))
-
-part2 :: Problem -> Int
-part2 problem@(width, height, _) =
-  snd $ foldl lastOfPath initial [target, start, target]
+  length $ findPath problem initial target
   where
     start = V2 1 0
     target = V2 (width - 2) (height - 1)
     initial = (start, 0)
-    lastOfPath from to = last $ findPath problem from to
 
--- | Given a Problem, find the shortest path from an initial (position, time) to the target position.
+part2 :: Problem -> Int
+part2 problem@(width, height, _) =
+  -- build the path from start to target, back to start, and back to target.
+  -- the result has the starting point as the first element, which doesn't
+  -- count as a step.
+  length . drop 1 $ foldl addToPath [initial] [target, start, target]
+  where
+    start = V2 1 0
+    target = V2 (width - 2) (height - 1)
+    initial = (start, 0)
+    -- extend a path by adding steps to another destination
+    addToPath pathSoFar dest =
+      pathSoFar ++ findPath problem (last pathSoFar) dest
+
+-- | Given a Problem, find the shortest path from an initial (position, loopIndex) to the target position.
+--
+-- Returns the sequence of (pos, index) states, ending with the target position.
 findPath :: Problem -> (Pos, Int) -> Pos -> [(Pos, Int)]
 findPath (width, height, blizzardLoop) initial target =
   path
@@ -101,16 +135,15 @@ findPath (width, height, blizzardLoop) initial target =
     loopLength = M.size blizzardLoop
 
     -- where the expedition can go next
-    neighbors (p, t) =
-      [ (p', t')
+    neighbors (p, li) =
+      [ (p', li')
         | d <- moveChoices,
-          let p' = p + d,
-          isOnBoard p',
-          not (S.member p' blizzardPositions)
+          let p' = p + d, -- position after moving
+          isOnBoard p', -- only move to locations on the board
+          not (S.member p' blizzardPositions) -- do not move where a blizzard is
       ]
       where
-        t' = t + 1
-        li' = t' `mod` loopLength
+        li' = (li + 1) `mod` loopLength
         blizzardPositions = fromJust $ M.lookup li' blizzardLoop
 
     -- The five choices are to stay put, or move in one of the four directions
@@ -125,7 +158,7 @@ findPath (width, height, blizzardLoop) initial target =
     -- All moves have the same cost
     transCost _ _ = 1 :: Int
 
-    -- Is a state the goal?
+    -- Is a state the goal?  Only position matters, not the loop index.
     isGoal (p, _) = p == target
 
     -- Is this location on the board?
