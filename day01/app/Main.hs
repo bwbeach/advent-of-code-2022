@@ -1,7 +1,8 @@
 module Main where
 
-import Data.List
-import Data.List.Split
+import Data.Function ((&))
+import Data.List (sort)
+import Data.List.Split (splitOn)
 
 main :: IO ()
 main = do
@@ -16,7 +17,15 @@ runInput fileName = do
   print . day01 3 $ input
 
 day01 :: Int -> String -> Int
-day01 n = sum . take n . reverse . sort . map sumStrings . splitOn [""] . endBy "\n"
+day01 n text =
+  text
+    & lines
+    & splitOn [""]
+    & map sumStrings
+    & sort
+    & reverse
+    & take n
+    & sum
 
 sumStrings :: [String] -> Int
 sumStrings = sum . map read
